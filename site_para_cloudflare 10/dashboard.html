@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Ponto Eletrônico - SRE CARAPINA</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .btn-punch {
+            height: 100px;
+            font-size: 1.1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .btn-punch {
+                height: 80px;
+                font-size: 0.9rem;
+            }
+
+            .navbar-brand {
+                font-size: 1rem;
+            }
+        }
+    </style>
+    <!-- jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+<!-- Version 7.1 - 2026-01-11 14:02 -->
+
+<body class="bg-light">
+
+    <nav class="navbar navbar-dark bg-primary mb-4">
+        <div class="container">
+            <span class="navbar-brand mb-0 h1">Ponto Eletrônico - SRE CARAPINA</span>
+            <div class="d-flex align-items-center">
+                <span id="connStatus" class="badge bg-secondary me-3">Offline</span>
+                <span class="text-white me-3" id="userName">User</span>
+                <button class="btn btn-outline-light btn-sm" onclick="logout()">Sair</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card shadow">
+                    <div class="card-body text-center">
+                        <h4 class="mb-3">Registrar Ponto</h4>
+                        <div
+                            style="font-size: 0.65rem; color: #000; opacity: 0.3; margin-top: 5px; letter-spacing: 1px;">
+                            MADE IA / GTI SRE CARAPINA</div>
+                        <div class="mt-2 text-muted" style="font-size: 0.7rem;">Versão 8.3</div>
+                        <div id="locationStatus" class="alert alert-warning">Obtendo localização...</div>
+                        <div class="row g-2 mt-2">
+                            <div class="col-12 col-md-5">
+                                <input type="text" class="form-control" id="locNeighborhood" placeholder="Bairro"
+                                    disabled>
+                            </div>
+                            <div class="col-12 col-md-5">
+                                <input type="text" class="form-control" id="locCity" placeholder="Cidade" disabled>
+                            </div>
+                            <div class="col-12 col-md-2 d-grid">
+                                <button id="editLocBtn" class="btn btn-outline-secondary">Editar</button>
+                            </div>
+                        </div>
+                        <div class="row g-2 mt-3">
+                            <div class="col-6 col-md-3 d-grid">
+                                <button class="btn btn-success btn-punch" onclick="registerPunch('Entrada')">☀️
+                                    Entrada</button>
+                            </div>
+                            <div class="col-6 col-md-3 d-grid">
+                                <button class="btn btn-warning btn-punch" onclick="registerPunch('Saída Almoço')">🍽️
+                                    Almoço</button>
+                            </div>
+                            <div class="col-6 col-md-3 d-grid">
+                                <button class="btn btn-info btn-punch" onclick="registerPunch('Volta Almoço')">☕
+                                    Volta</button>
+                            </div>
+                            <div class="col-6 col-md-3 d-grid">
+                                <button class="btn btn-danger btn-punch" onclick="registerPunch('Saída')">🏠
+                                    Saída</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card shadow">
+                    <div class="card-header">Meus Registros</div>
+                    <div class="card-body">
+                        <div class="row g-3 align-items-end mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Início</label>
+                                <input type="date" class="form-control" id="startDate">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Fim</label>
+                                <input type="date" class="form-control" id="endDate">
+                            </div>
+                            <div class="col-md-4">
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-outline-primary" onclick="downloadSiahresReport()">Baixar
+                                        Relatório SIAHRES (PDF)</button>
+                                    <button class="btn btn-secondary" onclick="downloadMyReport()">Baixar Excel
+                                        (Filtro)</button>
+                                    <button id="syncBtn" class="btn btn-primary" onclick="syncNow()">Sincronizar
+                                        agora</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Tipo</th>
+                                        <th>Data/Hora</th>
+                                        <th>Bairro</th>
+                                        <th>Cidade</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="historyTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js?v=7.2"></script>
+    <script>
+        let currentLocation = {
+            neighborhood: null,
+            city: null,
+            latitude: null,
+            longitude: null,
+            accuracy: null,
+            full_address: null
+        };
+        let locationReady = false;
+        let isLocating = false;
+        let todayPunches = new Set();
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('ponto_token');
+            if (!token) window.location.href = 'index.html';
+            document.getElementById('userName').innerText = localStorage.getItem('user_name');
+            initGeolocation();
+            loadHistory();
+            loadStatus();
+            checkEndOfMonth();
+            setInterval(loadStatus, 10000);
+            initGeolocation();
+        });
+
+        async function initGeolocation(ignoreIsLocating = false) {
+            if (isLocating && !ignoreIsLocating) return;
+            isLocating = true;
+
+            const statusDiv = document.getElementById('locationStatus');
+            statusDiv.innerText = "Obtendo localização GPS...";
+            statusDiv.className = "alert alert-warning";
+
+            if ("geolocation" in navigator) {
+                const geoOptionsHigh = {
+                    enableHighAccuracy: true,
+                    timeout: 5000,
+                    maximumAge: 0
+                };
+
+                const geoOptionsLow = {
+                    enableHighAccuracy: false,
+                    timeout: 15000,
+                    maximumAge: 0
+                };
+
+                const successCallback = async (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    currentLocation.latitude = lat;
+                    currentLocation.longitude = lon;
+                    currentLocation.accuracy = position.coords.accuracy;
+
+                    statusDiv.innerText = "Localização obtida. Processando endereço...";
+                    statusDiv.className = "alert alert-info";
+
+                    try {
+                        // Priority: Nominatim for better neighborhood accuracy in Brazil
+                        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, {
+                            headers: { 'User-Agent': 'PontoEletronicoApp/1.2' }
+                        });
+                        const data = await response.json();
+                        const addr = data.address || {};
+
+                        currentLocation.city = (addr.city || addr.town || addr.village || addr.municipality || "Vitória") + " - ES";
+                        // Neighborhoods in Nominatim can be in several fields
+                        currentLocation.neighborhood = addr.suburb || addr.neighbourhood || addr.neighbourhood_level2 || addr.hamlet || addr.residential || addr.district || "Desconhecido";
+                        currentLocation.full_address = data.display_name;
+
+                        statusDiv.innerText = `Localização: ${currentLocation.neighborhood}, ${currentLocation.city}`;
+                        statusDiv.className = "alert alert-success";
+
+                        document.getElementById('locNeighborhood').value = currentLocation.neighborhood;
+                        document.getElementById('locCity').value = currentLocation.city;
+                        locationReady = true;
+
+                        // Sticky Location: Update if precision is good or manual was set before
+                        if (currentLocation.accuracy && currentLocation.accuracy < 100) {
+                            saveStickyLocation(currentLocation.neighborhood, currentLocation.city);
+                        }
+                    } catch (error) {
+                        // ... existing fallback ...
+                        try {
+                            const alt = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=pt`);
+                            const js = await alt.json();
+                            currentLocation.city = (js.city || js.locality || "Vitória") + " - ES";
+                            currentLocation.neighborhood = js.locality || "Desconhecido";
+
+                            statusDiv.innerText = `Localização: ${currentLocation.neighborhood}, ${currentLocation.city}`;
+                            statusDiv.className = "alert alert-success";
+                            document.getElementById('locNeighborhood').value = currentLocation.neighborhood;
+                            document.getElementById('locCity').value = currentLocation.city;
+                            locationReady = true;
+                        } catch (e2) {
+                            statusDiv.innerText = "Localização identificada por coordenadas.";
+                            statusDiv.className = "alert alert-info";
+                            locationReady = true;
+                        }
+                    } finally {
+                        isLocating = false;
+                    }
+                };
+
+                const errorCallback = (err) => {
+                    console.warn(`Geolocation High Accuracy Failed (${err.code}): ${err.message}. Retrying with Low Accuracy...`);
+
+                    // Fallback to Low Accuracy
+                    navigator.geolocation.getCurrentPosition(successCallback, async (err2) => {
+                        console.error("Geolocation Low Accuracy Also Failed:", err2);
+
+                        // FINAL AUTOMATIC FALLBACK: Smart IP Geolocation
+                        // User requires automatic neighborhood detection.
+                        // We use ipwho.is which often provides better lat/lon for sorting into neighborhoods than generic APIs.
+                        statusDiv.innerText = "Localizando via Rede (Alta Precisão)...";
+
+                        try {
+                            // FINAL AUTOMATIC FALLBACK: Smart Multi-IP Geolocation
+                            statusDiv.innerText = "Localizando via Rede (Cross-Check)...";
+
+                            const providers = [
+                                'https://ipapi.co/json/',
+                                'https://ipwho.is/',
+                                'https://api.ipify.org?format=json' // Just for IP
+                            ];
+
+                            let bestLat, bestLon, bestCity, bestRegion;
+
+                            // Try multiple providers in parallel and pick the most detailed one
+                            const results = await Promise.allSettled([
+                                fetch('https://ipapi.co/json/').then(r => r.json()),
+                                fetch('https://ipwho.is/').then(r => r.json()),
+                                fetch('https://freeipapi.com/api/json').then(r => r.json())
+                            ]);
+
+                            results.forEach(res => {
+                                if (res.status === 'fulfilled') {
+                                    const d = res.value;
+                                    // if it's from ipapi.co
+                                    if (d.latitude && d.longitude && d.city) {
+                                        if (!bestLat || (d.city && d.city.toLowerCase().includes('vitoria'))) {
+                                            bestLat = d.latitude;
+                                            bestLon = d.longitude;
+                                            bestCity = d.city;
+                                        }
+                                    }
+                                    // if it's from ipwho.is
+                                    if (d.success && d.latitude) {
+                                        if (!bestLat || (d.city && d.city.toLowerCase().includes('vitoria'))) {
+                                            bestLat = d.latitude;
+                                            bestLon = d.longitude;
+                                            bestCity = bestCity || d.city;
+                                        }
+                                    }
+                                    // if it's from freeipapi.com
+                                    if (d.latitude && d.longitude && d.cityName) {
+                                        if (!bestLat || (d.cityName && d.cityName.toLowerCase().includes('vitoria'))) {
+                                            bestLat = d.latitude;
+                                            bestLon = d.longitude;
+                                            bestCity = bestCity || d.cityName;
+                                        }
+                                    }
+                                }
+                            });
+
+                            if (!bestLat) throw new Error("All IP providers failed");
+
+                            const lat = bestLat;
+                            const lon = bestLon;
+
+                            // OVERRIDE: Correction for known ISP mislocation (Santa Clara -> Jardim da Penha)
+                            if (bestCity && bestCity.includes("Vitória")) {
+                                // Common mismatch for Vivo/Claro fiber nodes in this region
+                                if (!bestRegion || bestRegion.includes("Santa Clara") || bestLat.toString().startsWith("-20.2") || bestLat.toString().startsWith("-20.3")) {
+                                    // Only apply if user hasn't explicitly set another sticky location
+                                    const currentSticky = getStickyLocation();
+                                    if (!currentSticky || currentSticky.neighborhood === "Santa Clara") {
+                                        console.log("Auto-correcting ISP location: Santa Clara -> Jardim da Penha");
+                                        // Mock the correct coords for Jardim da Penha to ensure Nominatim confirms it or just force it
+                                        // Coords: -20.286, -40.292 (approx)
+                                        // But better just force the name if we are sure.
+                                        // Let's force the name AFTER Nominatim or BEFORE?
+                                        // Let's force it in the Display Logic to be safe.
+                                    }
+                                }
+                            }
+
+                            // Now feed these coordinates into Nominatim (OSM) to get the "Official" Neighborhood name
+                            // This matches the behavior of valid GPS, ensuring consistency (e.g. "Jardim da Penha")
+                            statusDiv.innerText = "Refinando bairro...";
+
+                            const osmResp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, {
+                                headers: { 'User-Agent': 'PontoEletronicoApp/1.2' }
+                            });
+                            const osmData = await osmResp.json();
+                            const addr = osmData.address || {};
+
+                            currentLocation.city = (addr.city || addr.town || addr.village || addr.municipality || bestCity || "Vitória") + " - ES";
+                            currentLocation.neighborhood = addr.suburb || addr.neighbourhood || addr.neighbourhood_level2 || addr.hamlet || addr.residential || addr.district || bestCity || "Desconhecido";
+
+                            // AUTO-CORRECT: Santa Clara -> Jardim da Penha
+                            if (currentLocation.city.includes("Vitória") && (currentLocation.neighborhood.includes("Santa Clara") || currentLocation.neighborhood === "Vitória")) {
+                                currentLocation.neighborhood = "Jardim da Penha";
+                                // Save this correction immediately
+                                saveStickyLocation(currentLocation.neighborhood, currentLocation.city);
+                            }
+
+                            currentLocation.latitude = lat;
+                            currentLocation.longitude = lon;
+                            currentLocation.accuracy = 2500; // Network accuracy
+                            currentLocation.full_address = osmData.display_name || bestCity;
+
+                            // Apply Sticky Location if it exists and matches city
+                            const sticky = getStickyLocation();
+                            if (sticky && (currentLocation.city.includes(sticky.city) || sticky.city.includes(currentLocation.city))) {
+                                console.log("Applying Sticky Location for better desktop accuracy");
+                                currentLocation.neighborhood = sticky.neighborhood;
+                                currentLocation.city = sticky.city;
+                                statusDiv.innerText = `Localização (Ajustada): ${currentLocation.neighborhood}, ${currentLocation.city}`;
+                            } else {
+                                statusDiv.innerText = `Localização (Rede): ${currentLocation.neighborhood}, ${currentLocation.city}`;
+                            }
+
+                            statusDiv.className = "alert alert-success";
+                            document.getElementById('locNeighborhood').value = currentLocation.neighborhood;
+                            document.getElementById('locCity').value = currentLocation.city;
+                            locationReady = true;
+                            isLocating = false;
+
+                        } catch (e3) {
+                            console.error("IP Geoloc failed", e3);
+                            let reason = "Falha Geral";
+                            let hint = "Não foi possível determinar sua localização automaticamente.";
+
+                            switch (err2.code) {
+                                case 1: reason = "Permissão Negada"; hint = "Libere o acesso à localização no navegador."; break;
+                                default: reason = "Sinal de Localização Indisponível"; break;
+                            }
+
+                            statusDiv.innerHTML = `
+                                 <div>
+                                     <strong>${reason}</strong><br>
+                                     <small>${hint}<br>Verifique sua conexão Wi-Fi.</small>
+                                 </div>
+                                 <button class="btn btn-sm btn-light ms-2" onclick="initGeolocation()">Tentar Novamente</button>
+                             `;
+                            statusDiv.className = "alert alert-danger d-flex align-items-center justify-content-between";
+                            isLocating = false;
+                        }
+                    }, geoOptionsLow);
+                };
+
+                // First attempt: High Accuracy
+                navigator.geolocation.getCurrentPosition(successCallback, errorCallback, geoOptionsHigh);
+            } else {
+                alert("Geolocalização não suportada neste navegador.");
+            }
+        }
+        document.getElementById('editLocBtn').addEventListener('click', async () => {
+            const n = document.getElementById('locNeighborhood');
+            const c = document.getElementById('locCity');
+            const editing = n.disabled;
+
+            if (editing) {
+                // Prompt for password (DYNAMICALLY FETCHED)
+                let correctPass = "admin123"; // Fallback
+                try {
+                    statusDiv = document.getElementById('locationStatus');
+                    const originalStatus = statusDiv.innerText;
+                    statusDiv.innerText = "Verificando autorização...";
+
+                    if (window.API_READY) await window.API_READY;
+                    const res = await apiFetch('/api/config/location-password');
+                    const data = await res.json();
+                    if (data && data.password) correctPass = data.password;
+
+                    statusDiv.innerText = originalStatus;
+                } catch (e) {
+                    console.warn("Could not fetch remote password, using local fallback");
+                }
+
+                const pass = window.prompt("Digite a senha de administrador para editar a localização:");
+                if (pass !== correctPass) {
+                    alert("Senha incorreta. A edição não foi permitida.");
+                    return;
+                }
+
+                n.disabled = false;
+                c.disabled = false;
+                document.getElementById('editLocBtn').innerText = 'Salvar';
+                document.getElementById('editLocBtn').className = 'btn btn-primary';
+            } else {
+                // Saving the manual changes
+                n.disabled = true;
+                c.disabled = true;
+                document.getElementById('editLocBtn').innerText = 'Editar';
+                document.getElementById('editLocBtn').className = 'btn btn-outline-secondary';
+
+                currentLocation.neighborhood = n.value || currentLocation.neighborhood;
+                currentLocation.city = c.value || currentLocation.city;
+                document.getElementById('locationStatus').innerText = `Localização: ${currentLocation.neighborhood}, ${currentLocation.city}${currentLocation.accuracy ? ` (±${Math.round(currentLocation.accuracy)}m)` : ''}`;
+
+                // Save Sticky Location for future visits on this desktop
+                saveStickyLocation(currentLocation.neighborhood, currentLocation.city);
+            }
+        });
+
+        // Sticky Location Helpers
+        function saveStickyLocation(neighborhood, city) {
+            localStorage.setItem('sticky_location', JSON.stringify({ neighborhood, city, ts: Date.now() }));
+        }
+        function getStickyLocation() {
+            try {
+                const s = localStorage.getItem('sticky_location');
+                if (!s) return null;
+                const d = JSON.parse(s);
+                // Keep for 30 days
+                if (Date.now() - d.ts > 30 * 24 * 60 * 60 * 1000) return null;
+                return d;
+            } catch (e) { return null; }
+        }
+
+        let isProcessingPunch = false;
+
+        async function registerPunch(type) {
+            if (!locationReady) {
+                alert("Aguarde a localização ou verifique as permissões.");
+                return;
+            }
+
+            // Prevenção de Duplicidade Diária
+            if (todayPunches.has(type)) {
+                alert(`Você já registrou a ${type} de hoje!`);
+                return;
+            }
+
+            // Validação de Sequência
+            if (type === 'Saída Almoço') {
+                if (!todayPunches.has('Entrada')) {
+                    alert("Você não bateu a entrada! Registre a entrada primeiro.");
+                    return;
+                }
+            } else if (type === 'Volta Almoço') {
+                if (!todayPunches.has('Saída Almoço')) {
+                    alert("Você não bateu a saída para o almoço! Registre o almoço primeiro.");
+                    return;
+                }
+            } else if (type === 'Saída') {
+                if (!todayPunches.has('Volta Almoço')) {
+                    alert("Você não bateu a volta do almoço! Registre a volta primeiro.");
+                    return;
+                }
+            }
+            // Fim da Validação
+
+            if (isProcessingPunch) return;
+            isProcessingPunch = true;
+
+            const transaction_id = 'txn_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+            // Disable buttons
+            const buttons = document.querySelectorAll('.btn-punch');
+            buttons.forEach(b => b.disabled = true);
+            const originalText = {};
+            buttons.forEach((b, i) => {
+                originalText[i] = b.innerHTML;
+                const btnLabel = b.innerText.toLowerCase().trim();
+                // Match "Almoço" in "Saída Almoço", "Volta" in "Volta Almoço", etc.
+                if (type.toLowerCase().includes(btnLabel.split(' ').pop())) {
+                    b.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processando...';
+                }
+            });
+
+            const token = localStorage.getItem('ponto_token');
+            const punchData = {
+                type,
+                neighborhood: document.getElementById('locNeighborhood').value || currentLocation.neighborhood,
+                city: document.getElementById('locCity').value || currentLocation.city,
+                latitude: currentLocation.latitude,
+                longitude: currentLocation.longitude,
+                accuracy: currentLocation.accuracy,
+                full_address: currentLocation.full_address,
+                transaction_id: transaction_id
+            };
+
+            try {
+                if (window.API_READY) await window.API_READY;
+                // Add short timeout to avoid stuck UI if network hangs
+                const response = await apiFetch(`/api/punch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(punchData)
+                });
+                if (response.ok) {
+                    alert("Ponto registrado com sucesso!");
+                    loadHistory();
+                    initGeolocation(true);
+                } else if (response.status === 409) {
+                    // v4.8: Duplicate detected on server, don't show error, just refresh view
+                    console.warn("Ponto já existia no servidor (transação duplicada).");
+                    loadHistory();
+                    initGeolocation(true);
+                } else {
+                    const errJs = await response.json().catch(() => ({}));
+                    // If it's a server error (500), treat as offline to save as PENDING
+                    if (response.status >= 500) {
+                        throw new Error("Server Error: " + (errJs.message || response.statusText));
+                    }
+                    alert("Erro ao registrar ponto: " + (errJs.message || response.statusText));
+                }
+            } catch (error) {
+                console.log("Network fail or Server 500, saving offline...");
+                const r = offline.punchAdd(
+                    type,
+                    punchData.neighborhood,
+                    punchData.city,
+                    {
+                        latitude: punchData.latitude,
+                        longitude: punchData.longitude,
+                        accuracy: punchData.accuracy,
+                        full_address: punchData.full_address,
+                        transaction_id: punchData.transaction_id,
+                        matricula: getMatricula()
+                    }
+                );
+                if (r && r.ok) {
+                    alert("Ponto registrado offline. Será sincronizado quando online.");
+                    loadHistory();
+                    initGeolocation(true);
+                } else {
+                    alert("Erro de conexão ao tentar registrar offline.");
+                }
+            } finally {
+                isProcessingPunch = false;
+                buttons.forEach((b, i) => {
+                    b.disabled = false;
+                    b.innerHTML = originalText[i];
+                });
+            }
+        }
+
+        // v4.7: Robust matricula extraction
+        function getMatricula() {
+            let m = localStorage.getItem('user_matricula');
+            if (!m) {
+                const token = localStorage.getItem('ponto_token');
+                if (token && token.includes('.')) {
+                    try {
+                        const payload = JSON.parse(atob(token.split('.')[1]));
+                        m = payload.matricula;
+                        if (m) localStorage.setItem('matricula', m);
+                    } catch (e) { }
+                }
+            }
+            return m;
+        }
+
+        async function loadHistory(bypassCache = false) {
+            const token = localStorage.getItem('ponto_token');
+            const userMat = getMatricula();
+            const allRecords = [];
+            const cacheKey = 'cachedServerHistory_' + (userMat || 'anon');
+
+            let apiWorked = false;
+            try {
+                if (window.API_READY) await window.API_READY;
+                const response = await apiFetch(`/api/history`, { headers: { 'Authorization': `Bearer ${token}` } });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    let serverRecords = Array.isArray(data) ? data : (data.records || []);
+
+                    if (data.clear_cache) {
+                        console.log("Admin requested cache clear for this user.");
+                        localStorage.removeItem(cacheKey);
+                        offline.clear(userMat); // We need to add this clear method to offline object
+                        serverRecords = data.records || [];
+                    }
+
+                    if (Array.isArray(serverRecords)) {
+                        const oldCacheRaw = localStorage.getItem(cacheKey);
+                        let merged = serverRecords;
+                        if (oldCacheRaw) {
+                            try {
+                                const oldCache = JSON.parse(oldCacheRaw);
+                                const seenIds = new Set(serverRecords.map(r => r.transaction_id || (r.type + r.timestamp)));
+                                oldCache.forEach(oldR => {
+                                    const key = oldR.transaction_id || (oldR.type + oldR.timestamp);
+                                    if (!seenIds.has(key)) merged.push(oldR);
+                                });
+                            } catch (e) { }
+                        }
+                        merged.sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
+                        merged = merged.slice(0, 200);
+                        localStorage.setItem(cacheKey, JSON.stringify(merged));
+                        merged.forEach(r => allRecords.push({ ...r, pending: !!r.pending }));
+                        apiWorked = true;
+                    }
+                } else if (response.status >= 500) {
+                    throw new Error("Server History Error");
+                }
+            } catch (error) {
+                console.warn("API history failed, falling back to cache if allowed...", error);
+            }
+
+            if (!apiWorked && !bypassCache) {
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) {
+                    try {
+                        const cachedRecords = JSON.parse(cached);
+                        cachedRecords.forEach(r => allRecords.push({ ...r, pending: !!r.pending }));
+                    } catch (e) { }
+                }
+            }
+
+            // Always merge with local offline queue for the current user
+            try {
+                const localPunches = offline.history(userMat);
+                localPunches.forEach(lp => {
+                    // Robust deduplication: Ignore seconds/millis differences if needed, 
+                    // but for now, exact match or match within 1 second.
+                    const isDuplicate = allRecords.some(r => {
+                        if (r.type !== lp.type) return false;
+                        // timestamps might have .microseconds on server
+                        const t1 = r.timestamp.split('.')[0];
+                        const t2 = lp.timestamp.split('.')[0];
+                        return t1 === t2;
+                    });
+                    if (!isDuplicate) {
+                        allRecords.push(lp);
+                    }
+                });
+            } catch (e) {
+                console.error("Local history error", e);
+            }
+
+            // Render joined and deduplicated history
+            const tbody = document.getElementById('historyTable');
+            tbody.innerHTML = '';
+
+            // v6.8: Filter by current month only to "reset" users' view every month
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const currentMonthStr = `${year}-${month}`;
+
+            const monthlyRecords = allRecords.filter(r => (r.timestamp || "").startsWith(currentMonthStr));
+
+            // Atualiza o estado dos pontos de hoje para validação de sequência
+            const day = String(now.getDate()).padStart(2, '0');
+            const todayStr = `${year}-${month}-${day}`;
+            todayPunches.clear();
+            allRecords.forEach(r => {
+                if ((r.timestamp || "").startsWith(todayStr)) {
+                    todayPunches.add(r.type);
+                }
+            });
+
+            // Sort by timestamp desc to keep newest on top
+            monthlyRecords.sort((a, b) => {
+                const dateA = (a.timestamp || "").split('.')[0];
+                const dateB = (b.timestamp || "").split('.')[0];
+                return dateB.localeCompare(dateA);
+            });
+
+            monthlyRecords.forEach(r => {
+                const pendingBadge = r.pending ? `<span class="badge bg-warning text-dark ms-2">pendente</span>` : '';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${r.type}${pendingBadge}</td><td>${r.timestamp}</td><td>${r.neighborhood || '-'}</td><td>${r.city || '-'}</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        let isOnline = false;
+        let firstLoad = true;
+
+        async function loadStatus() {
+            try {
+                if (window.API_READY) await window.API_READY;
+                // Timeout curto para status check (3s) para não travar UI
+                const res = await apiFetch(`/api/online?t=${Date.now()}`, { method: 'GET' });
+
+                if (res && res.ok) {
+                    const js = await res.json();
+                    const badge = document.getElementById('connStatus');
+
+                    // Consideramos online se a API respondeu, mesmo que DB esteja lento (db_online pode ser false em startups)
+                    // Mas idealmente queremos ambos. Se DB off, mostramos Aviso.
+                    const currentlyOnline = js.online;
+                    const dbOnline = js.db_online;
+
+                    if (currentlyOnline) {
+                        if (dbOnline) {
+                            badge.className = 'badge bg-success me-3';
+                            badge.innerText = 'Online';
+                        } else {
+                            badge.className = 'badge bg-danger me-3';
+                            badge.innerText = 'Offline';
+                        }
+
+                        // Auto-sync transition: Offline -> Online OR First Load
+                        if (!isOnline) {
+                            console.log("Connection verified/restored. Auto-syncing...");
+                            syncNow(true); // Silent mode
+                        }
+                        isOnline = true;
+                    } else {
+                        badge.className = 'badge bg-danger me-3';
+                        badge.innerText = 'Offline';
+                        isOnline = false;
+                    }
+                } else {
+                    throw new Error("API Error " + res.status);
+                }
+
+                document.getElementById('syncBtn').disabled = false;
+
+                // Update pending count if offline
+                if (!isOnline) checkPendingCount();
+
+                firstLoad = false;
+            } catch (e) {
+                console.warn("Status check failed:", e);
+                const badge = document.getElementById('connStatus');
+                badge.className = 'badge bg-danger me-3';
+                badge.innerText = 'Offline';
+                isOnline = false;
+                document.getElementById('syncBtn').disabled = false;
+            }
+        }
+
+        async function checkPendingCount() {
+            // Optional: update UI with number of pending items
+            // This would require exposing existing offline queue length
+            // For now, we rely on the table rendering "pendente" badges
+        }
+
+        function initApiUi() {
+            // Removido conforme solicitado
+        }
+
+        async function syncNow(isSilent = false) {
+            const btn = document.getElementById('syncBtn');
+            const originalBtnHtml = btn ? btn.innerHTML : '';
+            if (btn && !isSilent) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sincronizando...';
+            }
+
+            const token = localStorage.getItem('ponto_token');
+            let msg = '';
+            let serverSuccess = false;
+            let totalMigrated = 0;
+            let errors = [];
+
+            // 1. Server-Side Sync (SQL <-> SQLite)
+            try {
+                if (window.API_READY) await window.API_READY;
+                const res = await apiFetch(`/api/sync`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+
+                let js = {};
+                try {
+                    js = await res.json();
+                } catch (jsonErr) {
+                    js = { message: "Resposta do servidor inválida (não-JSON)" };
+                }
+
+                if (res.ok) {
+                    serverSuccess = true;
+                    totalMigrated += (js.migrated || 0);
+                    if (!isSilent) msg += (js.message || `Sincronização servidor: ${js.migrated || 0} registros.`) + '\n';
+
+                    // v6.6: Also report partial errors from server sync
+                    if (js.errors && Array.isArray(js.errors) && js.errors.length > 0) {
+                        js.errors.forEach(e => errors.push("Servidor: " + e));
+                    }
+                } else if (!isSilent) {
+                    errors.push('Erro servidor (' + res.status + '): ' + (js.message || res.statusText));
+                    if (js.errors && Array.isArray(js.errors)) {
+                        js.errors.forEach(e => errors.push(e));
+                    }
+                }
+            } catch (e) {
+                if (!isSilent) errors.push('Servidor indisponível para sincronização.');
+            }
+
+            // 2. Client-Side Sync (Browser -> Backend)
+            try {
+                if (window.offline && window.offline.sync) {
+                    const r = await offline.sync(token);
+                    totalMigrated += r.migrated;
+                    if (!isSilent && r.migrated > 0) {
+                        msg += `Enviados do navegador: ${r.migrated} registros.\n`;
+                    }
+                }
+            } catch (e) {
+                if (!isSilent) errors.push('Erro ao sincronizar dados do navegador.');
+            }
+
+            if (btn && !isSilent) {
+                btn.disabled = false;
+                btn.innerHTML = originalBtnHtml;
+            }
+
+            if (isSilent) {
+                if (totalMigrated > 0) {
+                    alert(`Sincronização automática concluída: ${totalMigrated} registros enviados.`);
+                }
+            } else {
+                let finalMsg = msg || '';
+                if (errors.length > 0) {
+                    finalMsg += '\nProblemas detectados:\n' + errors.join('\n');
+                }
+                if (!finalMsg) finalMsg = 'Nenhum dado pendente de sincronização.';
+                alert(finalMsg);
+            }
+            loadHistory(true);
+            loadStatus();
+        }
+
+
+        async function downloadSiahresReport() {
+            if (!window.jspdf) { alert("Biblioteca PDF carregando..."); return; }
+            const { jsPDF } = window.jspdf;
+            // LANDSCAPE orientation (A4: 297mm x 210mm)
+            const doc = new jsPDF({ orientation: 'landscape', format: 'a4' });
+
+            // Logo (Brasao) - Load async
+            const logo = new Image();
+            logo.src = 'brasao.png';
+            try {
+                await new Promise((resolve) => {
+                    if (logo.complete) return resolve();
+                    logo.onload = resolve;
+                    logo.onerror = resolve;
+                });
+                // Compact Image: x=10, y=5, w=15, h=18
+                doc.addImage(logo, 'PNG', 10, 5, 15, 18);
+            } catch (e) {
+                console.warn("Logo loading failed", e);
+            }
+
+            const userName = localStorage.getItem('user_name') || "Servidor";
+            const matricula = localStorage.getItem('matricula') || getMatricula() || "";
+            const s = document.getElementById('startDate').value;
+            let reportDate = new Date();
+            if (s) reportDate = new Date(s + "T12:00:00");
+
+            const monthNames = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
+            const monthStr = monthNames[reportDate.getMonth()];
+            const yearStr = reportDate.getFullYear();
+
+            const centerX = 297 / 2;
+
+            // Compact Header
+            doc.setFontSize(10); // Reduced
+            doc.setFont("helvetica", "bold");
+            const center = (txt, y) => doc.text(txt, centerX, y, { align: "center" });
+
+            center("GOVERNO DO ESTADO DO ESPÍRITO SANTO", 8);
+            center("SECRETARIA DE ESTADO DA EDUCAÇÃO", 12);
+            center("SRE CARAPINA", 16);
+
+            doc.setFontSize(11);
+            center("Apuração Diária de Frequência", 22);
+
+            doc.setFontSize(8);
+            doc.text("SIARHES", 285, 8, { align: "right" });
+
+            // Info Line (Compact)
+            const yInfo = 28;
+            doc.setFontSize(9);
+            const col1 = 15, col2 = 100, col3 = 160, col4 = 220;
+
+            const userCargo = localStorage.getItem('user_cargo') || "Funcionario";
+            doc.text(`Servidor(a): ${userName}`, col1, yInfo);
+            doc.text(`Matrícula: ${matricula}`, col2, yInfo);
+            doc.text(`Mês/Ano: ${monthStr} / ${yearStr}`, col3, yInfo);
+            doc.text(`Cargo: ${userCargo}`, col4, yInfo);
+
+            document.body.style.cursor = 'wait';
+            let records = [];
+            try {
+                const y = reportDate.getFullYear();
+                const m = reportDate.getMonth();
+                const startStr = s || new Date(y, m, 1).toISOString().split('T')[0];
+                const endStr = document.getElementById('endDate').value || new Date(y, m + 1, 0).toISOString().split('T')[0];
+
+                const token = localStorage.getItem('ponto_token');
+                if (window.API_READY) await window.API_READY;
+                const url = `/api/history?start_date=${startStr}&end_date=${endStr}`;
+                const response = await apiFetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    records = Array.isArray(data) ? data : (data.records || []);
+                } else {
+                    const cacheKey = 'cachedServerHistory_' + (getMatricula() || 'anon');
+                    const cached = localStorage.getItem(cacheKey);
+                    if (cached) records = JSON.parse(cached);
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Erro ao buscar dados.");
+            }
+            document.body.style.cursor = 'default';
+
+            const dStart = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1);
+            const dEnd = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0);
+            const fmt = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+            const reportData = [];
+
+            for (let d = new Date(dStart); d <= dEnd; d.setDate(d.getDate() + 1)) {
+                const dayStr = fmt(d);
+                const dayRecords = records.filter(r => r.timestamp.startsWith(dayStr));
+                const getTime = (type) => {
+                    const match = dayRecords.find(r => r.type === type);
+                    return match ? match.timestamp.split(' ')[1].substring(0, 5) : "";
+                };
+
+                let row = [
+                    d.getDate().toString(),
+                    getTime('Entrada'), "", getTime('Saída Almoço'), "",
+                    getTime('Volta Almoço'), "", getTime('Saída'), ""
+                ];
+
+                const dayOfWeek = d.getDay();
+                if ((dayOfWeek === 0 || dayOfWeek === 6) && dayRecords.length === 0) {
+                    row = [d.getDate().toString(), dayOfWeek === 0 ? "DOMINGO" : "SÁBADO"];
+                }
+                reportData.push(row);
+            }
+
+            // AUTO-TABLE Compact Config
+            doc.autoTable({
+                startY: 32, // Moved up
+                margin: { left: 10, right: 10, bottom: 15 }, // Ensure space for footer
+                pageBreak: 'avoid', // Try to keep on one page (though hard limit)
+                showHead: 'everyPage', // Only if it breaks, which we want to avoid
+
+                head: [
+                    [
+                        { content: 'DIA', rowSpan: 2, styles: { valign: 'middle', halign: 'center' } },
+                        { content: 'HORÁRIO MANHÃ', colSpan: 4, styles: { halign: 'center', fillColor: [220, 220, 220] } },
+                        { content: 'HORÁRIO TARDE', colSpan: 4, styles: { halign: 'center', fillColor: [220, 220, 220] } }
+                    ],
+                    ['ENTRADA', 'ASSINATURA', 'SAÍDA', 'ASSINATURA', 'ENTRADA', 'ASSINATURA', 'SAÍDA', 'ASSINATURA'].map(t => ({ content: t, styles: { halign: 'center' } }))
+                ],
+                body: reportData,
+                theme: 'grid',
+                styles: {
+                    fontSize: 7, // Smaller font
+                    cellPadding: 0.5, // Very tight padding
+                    lineColor: [0, 0, 0],
+                    lineWidth: 0.1,
+                    textColor: [0, 0, 0],
+                    minCellHeight: 3.5, // Force compact rows
+                    valign: 'middle'
+                },
+                headStyles: {
+                    fillColor: [220, 220, 220],
+                    textColor: [0, 0, 0],
+                    fontStyle: 'bold',
+                    lineWidth: 0.1,
+                    minCellHeight: 4,
+                    fontSize: 7
+                },
+                columnStyles: {
+                    0: { cellWidth: 9, halign: 'center' }, // Dia
+                    1: { cellWidth: 15, halign: 'center' }, // T1
+                    2: { cellWidth: 51, halign: 'center' }, // Sig1
+                    3: { cellWidth: 15, halign: 'center' }, // T2
+                    4: { cellWidth: 51, halign: 'center' }, // Sig2
+                    5: { cellWidth: 15, halign: 'center' }, // T3
+                    6: { cellWidth: 51, halign: 'center' }, // Sig3
+                    7: { cellWidth: 15, halign: 'center' }, // T4
+                    8: { cellWidth: 51, halign: 'center' }  // Sig4
+                },
+                didParseCell: function (data) {
+                    if (data.section === 'body' && data.column.index === 1 && data.row.raw.length === 2) {
+                        data.cell.colSpan = 8;
+                        data.cell.styles.halign = 'center';
+                        data.cell.styles.fillColor = [240, 240, 240];
+                    }
+                }
+            });
+
+            // Signatures (Compact Layout)
+            // Use static Y if table fits, or dynamic if slight push
+            // Max Y available approx 200mm
+            let finalY = doc.lastAutoTable.finalY + 10;
+            // Force footer to bottom if lots of space, or tightly after table
+            if (finalY < 180) finalY = 180;
+            if (finalY > 195) finalY = 195; // Cap at bottom margin
+
+            doc.setLineWidth(0.1);
+            doc.setFontSize(8); // Match table font
+            const line = (x1, x2, txt, y) => { doc.line(x1, y, x2, y); doc.text(txt, (x1 + x2) / 2, y + 3, { align: 'center' }); };
+
+            line(40, 110, "ASSINATURA DO SERVIDOR", finalY);
+            line(180, 250, "ASSINATURA DA CHEFIA IMEDIATA", finalY);
+
+            doc.save(`Frequencia_${monthStr}_${userName}.pdf`);
+        }
+
+        async function downloadMyReport() {
+            const token = localStorage.getItem('ponto_token');
+            const s = document.getElementById('startDate').value;
+            const e = document.getElementById('endDate').value;
+            let url = `/api/user/report`;
+            const params = [];
+            if (s) params.push(`start_date=${s}`);
+            if (e) params.push(`end_date=${e}`);
+            if (params.length) url += `?${params.join('&')}`;
+            try {
+                if (window.API_READY) await window.API_READY;
+                const response = await apiFetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = 'meus_registros.xlsx';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                } else {
+                    const err = await response.json().catch(() => ({}));
+                    alert('Erro ao gerar Excel: ' + (err.message || response.statusText));
+                }
+            } catch (err) {
+                alert('Erro de conexão.');
+            }
+        }
+
+        function logout() {
+            // Preserve offlineQueue, offlineUsers, and API settings.
+            // Only clear current session.
+            localStorage.removeItem('ponto_token');
+            localStorage.removeItem('user_role');
+            localStorage.removeItem('user_name');
+            localStorage.removeItem('user_cargo');
+            window.location.href = 'index.html';
+        }
+
+        function checkEndOfMonth() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = today.getMonth();
+            const lastDay = new Date(year, month + 1, 0).getDate();
+            const daysRemaining = lastDay - today.getDate();
+
+            // Warn if 3 days or less remaining (0 means today is last day)
+            if (daysRemaining <= 3) {
+                if (!sessionStorage.getItem('monthAlertShown')) {
+                    const msg = daysRemaining === 0
+                        ? `ATENÇÃO: Hoje é o ÚLTIMO DIA do mês!\n\nPor favor, exporte seus registros clicando em 'Baixar Excel' AGORA.\nA partir de amanhã, sua lista de registros começará do zero para o novo mês.`
+                        : `Atenção: Faltam apenas ${daysRemaining} dia(s) para o fim do mês.\n\nPor favor, exporte seus registros clicando em 'Baixar Excel'.\nOs dados sumirão da sua visualização no dia 1º.`;
+                    alert(msg);
+                    sessionStorage.setItem('monthAlertShown', 'true');
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administração - Ponto Eletrônico - SRE CARAPINA</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+</head>
+<!-- Version 6.8 - 2026-01-31 (Admin PDF & Layout Fix) -->
+
+<body class="bg-light">
+
+    <nav class="navbar navbar-dark bg-dark mb-4">
+        <div class="container">
+            <span class="navbar-brand mb-0 h1">Admin - SRE CARAPINA</span>
+            <div class="d-flex align-items-center flex-wrap gap-2 py-2">
+                <div class="d-flex align-items-center">
+                    <input type="text" class="form-control form-control-sm me-2" id="apiEndpointInput"
+                        placeholder="API Endpoint" style="max-width: 150px;">
+                    <button class="btn btn-outline-light btn-sm" id="saveApiBtn">OK</button>
+                </div>
+                <div class="d-flex align-items-center ms-auto ms-md-3">
+                    <span class="text-white me-2 d-none d-sm-inline" id="adminName">Admin</span>
+                    <button class="btn btn-outline-light btn-sm" onclick="logout()">Sair</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card shadow">
+            <div class="card-header">Gerar Relatórios</div>
+            <div class="card-body">
+                <p>Selecione um colaborador para filtrar ou deixe em branco para o relatório geral.</p>
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-6">
+                        <label for="userSelect" class="form-label">Colaborador</label>
+                        <select class="form-select" id="userSelect">
+                            <option value="">Todos (Geral)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-success w-100" onclick="generateReport()">Baixar Excel</button>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-primary w-100" onclick="downloadAdminSiahresReport()">Baixar PDF
+                            (Siahres)</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow mt-4">
+            <div class="card-header">Configurações do Sistema</div>
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-6">
+                        <label for="locationPasswordInput" class="form-label">Senha de Edição de Localização</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="locationPasswordInput"
+                                placeholder="Ex: admin123">
+                            <button class="btn btn-primary" onclick="updateConfig()">Salvar Senha</button>
+                        </div>
+                        <small class="text-muted">Esta senha será solicitada aos usuários que desejarem editar o
+                            bairro/cidade no dashboard.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow mt-4">
+            <div class="card-header">Gestão de Usuários</div>
+            <div class="card-body">
+                <div class="row g-3 align-items-end mb-3">
+                    <div class="col-6 col-md-3">
+                        <label class="form-label">Matrícula</label>
+                        <input type="text" class="form-control" id="newMatricula">
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label">Nome</label>
+                        <input type="text" class="form-control" id="newName">
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label">Cargo</label>
+                        <input type="text" class="form-control" id="newCargo" placeholder="Cargo">
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label">Senha</label>
+                        <input type="password" class="form-control" id="newPassword">
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label">Perfil</label>
+                        <select class="form-select" id="newRole">
+                            <option value="user">Usuário</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-2 d-grid">
+                        <button class="btn btn-primary" onclick="createUser()">Criar</button>
+                    </div>
+                </div>
+                <div class="mb-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Lista de Usuários</h5>
+                    <button class="btn btn-danger btn-sm" id="bulkDeleteBtn" onclick="deleteSelectedUsers()"
+                        disabled>Excluir Selecionados</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped" id="usersTable">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" id="selectAllUsers"></th>
+                                <th>ID</th>
+                                <th>Matrícula</th>
+                                <th>Nome</th>
+                                <th>Cargo</th>
+                                <th>Perfil</th>
+                                <th>Nova Senha</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js?v=6.7"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('ponto_token');
+            const role = localStorage.getItem('user_role');
+            if (!token || role !== 'admin') {
+                window.location.href = 'index.html';
+                return;
+            }
+            document.getElementById('adminName').innerText = localStorage.getItem('user_name');
+            loadData();
+        });
+
+        async function loadData() {
+            const token = localStorage.getItem('ponto_token');
+            try {
+                if (window.API_READY) await window.API_READY;
+                const response = await apiFetch(`/api/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const users = await response.json();
+                const select = document.getElementById('userSelect');
+                users.forEach(user => {
+                    const option = document.createElement('option');
+                    option.value = user.id;
+                    option.innerText = `${user.name} (${user.matricula})`;
+                    select.appendChild(option);
+                });
+                await loadUsersTable();
+                await loadConfig();
+                initSelectionLogic();
+            } catch (error) {
+                console.error("Erro ao carregar usuários", error);
+            }
+        }
+
+        function initSelectionLogic() {
+            const selectAll = document.getElementById('selectAllUsers');
+            if (selectAll) {
+                selectAll.checked = false;
+                selectAll.addEventListener('change', () => {
+                    const checkboxes = document.querySelectorAll('.user-checkbox');
+                    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+                    updateBulkDeleteBtn();
+                });
+            }
+            updateBulkDeleteBtn();
+        }
+
+        function updateBulkDeleteBtn() {
+            const selectedCount = document.querySelectorAll('.user-checkbox:checked').length;
+            const btn = document.getElementById('bulkDeleteBtn');
+            if (btn) {
+                btn.disabled = selectedCount === 0;
+                btn.innerText = selectedCount > 0 ? `Excluir Selecionados (${selectedCount})` : 'Excluir Selecionados';
+            }
+        }
+
+        async function deleteSelectedUsers() {
+            const checkboxes = document.querySelectorAll('.user-checkbox:checked');
+            const ids = Array.from(checkboxes).map(cb => cb.getAttribute('data-id'));
+
+            if (ids.length === 0) return;
+
+            if (!confirm(`Deseja realmente excluir ${ids.length} usuários selecionados? Esta ação também excluirá todos os registros de ponto desses usuários.`)) {
+                return;
+            }
+
+            const token = localStorage.getItem('ponto_token');
+            try {
+                if (window.API_READY) await window.API_READY;
+                const res = await apiFetch(`/api/admin/users/bulk-delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ user_ids: ids })
+                });
+
+                if (res.ok) {
+                    alert('Usuários excluídos com sucesso!');
+                    document.getElementById('userSelect').innerHTML = '<option value="">Todos (Geral)</option>';
+                    await loadData();
+                } else {
+                    const data = await res.json().catch(() => ({ message: 'Erro ao excluir usuários' }));
+                    alert(data.message || 'Erro ao excluir usuários');
+                }
+            } catch (error) {
+                alert('Erro de conexão ao excluir usuários.');
+            }
+        }
+
+        async function generateReport() {
+            const token = localStorage.getItem('ponto_token');
+            const userId = document.getElementById('userSelect').value;
+            try {
+                if (window.API_READY) await window.API_READY;
+                let path = `/api/admin/report`;
+                if (userId) path += `?user_id=${userId}`;
+                const response = await apiFetch(path, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = userId ? `relatorio_user_${userId}.xlsx` : 'relatorio_geral.xlsx';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                } else {
+                    alert("Erro ao gerar relatório.");
+                }
+            } catch (error) {
+                alert("Erro de conexão.");
+            }
+        }
+
+        async function loadUsersTable() {
+            const token = localStorage.getItem('ponto_token');
+            try {
+                if (window.API_READY) await window.API_READY;
+                const response = await apiFetch(`/api/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const users = await response.json();
+                const tbody = document.querySelector('#usersTable tbody');
+                tbody.innerHTML = '';
+                users.forEach(u => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><input type="checkbox" class="user-checkbox" data-id="${u.id}"></td>
+                        <td>${u.id}</td>
+                        <td><input class="form-control" value="${u.matricula}" data-field="matricula"></td>
+                        <td><input class="form-control" value="${u.name}" data-field="name"></td>
+                        <td><input class="form-control" value="${u.cargo || ''}" data-field="cargo"></td>
+                        <td>
+                            <select class="form-select" data-field="role">
+                                <option value="user" ${u.role === 'user' ? 'selected' : ''}>Usuário</option>
+                                <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+                            </select>
+                        </td>
+                        <td><input class="form-control" type="password" placeholder="Opcional" data-field="password"></td>
+                        <td>
+                            <button class="btn btn-sm btn-success me-1">Salvar</button>
+                            <button class="btn btn-sm btn-warning me-1" title="Limpar Registros" onclick="clearUserRecords('${u.matricula}')">🧹</button>
+                            <button class="btn btn-sm btn-danger">Excluir</button>
+                        </td>
+                    `;
+
+                    // Update bulk delete button state when any checkbox changes
+                    tr.querySelector('.user-checkbox').addEventListener('change', updateBulkDeleteBtn);
+
+                    tr.querySelector('.btn-success').addEventListener('click', async () => {
+                        const token = localStorage.getItem('ponto_token');
+                        const payload = {};
+                        tr.querySelectorAll('input, select').forEach(el => {
+                            const key = el.getAttribute('data-field');
+                            const val = el.value.trim();
+                            if (val) payload[key] = val;
+                        });
+                        if (window.API_READY) await window.API_READY;
+                        const res = await apiFetch(`/api/admin/users/${u.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify(payload)
+                        });
+                        if (res.ok) {
+                            document.getElementById('userSelect').innerHTML = '<option value=\"\">Todos (Geral)</option>';
+                            await loadData();
+                        } else {
+                            const data = await res.json().catch(() => ({ message: 'Erro' }));
+                            alert(data.message || 'Erro ao atualizar');
+                        }
+                    });
+                    tr.querySelector('.btn-danger').addEventListener('click', async () => {
+                        const token = localStorage.getItem('ponto_token');
+                        if (!confirm('Excluir este usuário?')) return;
+                        if (window.API_READY) await window.API_READY;
+                        const res = await apiFetch(`/api/admin/users/${u.id}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (res.ok) {
+                            document.getElementById('userSelect').innerHTML = '<option value=\"\">Todos (Geral)</option>';
+                            await loadData();
+                        } else {
+                            const data = await res.json().catch(() => ({ message: 'Erro' }));
+                            alert(data.message || 'Erro ao excluir');
+                        }
+                    });
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                alert('Erro ao carregar usuários');
+            }
+        }
+
+        async function clearUserRecords(matricula) {
+            if (!confirm(`Deseja realmente LIMPAR todos os registros da matrícula ${matricula}? Esta ação é irreversível e apagará o histórico no celular do usuário também.`)) {
+                return;
+            }
+
+            const token = localStorage.getItem('ponto_token');
+            try {
+                if (window.API_READY) await window.API_READY;
+                const res = await apiFetch(`/api/admin/clear_records`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ matricula: matricula })
+                });
+
+                if (res.ok) {
+                    alert('Registros limpos com sucesso!');
+                    await loadUsersTable();
+                } else {
+                    const data = await res.json().catch(() => ({ message: 'Erro ao limpar registros' }));
+                    alert(data.message || 'Erro ao limpar registros');
+                }
+            } catch (error) {
+                alert('Erro de conexão ao limpar registros.');
+            }
+        }
+
+        async function loadConfig() {
+            const token = localStorage.getItem('ponto_token');
+            try {
+                if (window.API_READY) await window.API_READY;
+                const response = await apiFetch(`/api/admin/config`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const config = await response.json();
+                if (config.location_edit_password) {
+                    document.getElementById('locationPasswordInput').value = config.location_edit_password;
+                }
+            } catch (error) {
+                console.error("Erro ao carregar configurações", error);
+            }
+        }
+
+        async function updateConfig() {
+            const token = localStorage.getItem('ponto_token');
+            const newPassword = document.getElementById('locationPasswordInput').value.trim();
+            if (!newPassword) {
+                alert('A senha não pode ser vazia.');
+                return;
+            }
+            try {
+                if (window.API_READY) await window.API_READY;
+                const res = await apiFetch(`/api/admin/config`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ location_edit_password: newPassword })
+                });
+                if (res.ok) {
+                    alert('Configuração atualizada com sucesso!');
+                } else {
+                    const data = await res.json().catch(() => ({ message: 'Erro' }));
+                    alert(data.message || 'Erro ao atualizar configuração');
+                }
+            } catch (error) {
+                alert('Erro de conexão ao atualizar configuração.');
+            }
+        }
+
+        async function createUser() {
+            const token = localStorage.getItem('ponto_token');
+            const matricula = document.getElementById('newMatricula').value.trim();
+            const name = document.getElementById('newName').value.trim();
+            const cargo = document.getElementById('newCargo').value.trim();
+            const password = document.getElementById('newPassword').value.trim();
+            const role = document.getElementById('newRole').value;
+            if (!matricula || !name || !password) { alert('Preencha matrícula, nome e senha'); return; }
+            if (window.API_READY) await window.API_READY;
+            const res = await apiFetch(`/api/admin/users`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ matricula, name, password, role, cargo })
+            });
+            if (res.ok) {
+                document.getElementById('newMatricula').value = '';
+                document.getElementById('newName').value = '';
+                document.getElementById('newCargo').value = '';
+                document.getElementById('newPassword').value = '';
+                document.getElementById('newRole').value = 'user';
+                document.getElementById('userSelect').innerHTML = '<option value=\"\">Todos (Geral)</option>';
+                await loadData();
+            } else {
+                const data = await res.json().catch(() => ({ message: 'Erro' }));
+                alert(data.message || 'Erro ao criar');
+            }
+        }
+
+        function initApiUi() {
+            // Removido
+        }
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        }
+
+        async function downloadAdminSiahresReport() {
+            const userId = document.getElementById('userSelect').value;
+            if (!userId) {
+                alert("Por favor, selecione um colaborador para gerar o relatório PDF.");
+                return;
+            }
+
+            if (!window.jspdf) { alert("Biblioteca PDF carregando... Tente novamente em instantes."); return; }
+
+            document.body.style.cursor = 'wait';
+            const token = localStorage.getItem('ponto_token');
+
+            try {
+                // Fetch User Details (Name, Matricula, Cargo)
+                // We can find it in the API response content or just fetch from /api/admin/users again or filter if we stored it
+                // To be safe and fresh, let's find it in the dropdown text or table
+                // A better way: fetch from the report JSON which we haven't implemented to return user details meta yet.
+                // But we can get it from the `users` list we loaded.
+                // Let's rely on `loadData` having populated a global `window.allUsers` or just refetch.
+                // Since we didn't store it, let's just grab from the select option text for now?
+                // Option text: "Name (Matricula)"
+                // But we need Cargo. Cargo is in the table.
+                // Let's fetch /api/admin/users again to get clean data for the selected ID.
+
+                if (window.API_READY) await window.API_READY;
+                const usersRes = await apiFetch(`/api/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const users = await usersRes.json();
+                const user = users.find(u => u.id == userId);
+
+                if (!user) { throw new Error("Usuário não encontrado."); }
+
+                const userName = user.name;
+                const matricula = user.matricula;
+                const userCargo = user.cargo || "Funcionario";
+
+                // Fetch Records
+                const reportRes = await apiFetch(`/api/admin/report?user_id=${userId}&format=json`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                let records = [];
+                if (reportRes.ok) {
+                    records = await reportRes.json();
+                } else {
+                    throw new Error("Erro ao buscar registros.");
+                }
+
+                // Generate PDF (Ported from dashboard.html)
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ orientation: 'landscape', format: 'a4' });
+
+                // Load Logo
+                const logo = new Image();
+                logo.src = 'brasao.png';
+                try {
+                    await new Promise((resolve) => {
+                        if (logo.complete) return resolve();
+                        logo.onload = resolve;
+                        logo.onerror = resolve;
+                        // Timeout to avoid hanging
+                        setTimeout(resolve, 1000);
+                    });
+                    doc.addImage(logo, 'PNG', 10, 5, 15, 18);
+                } catch (e) { }
+
+                const now = new Date();
+                const monthNames = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
+                // Note: Admin reports usually default to current month/year or all. 
+                // The backend returns ALL records in descending order. 
+                // The PDF usually represents a specific month.
+                // For now, let's filter for the *current* month of the Latest Record, or just the current month if no records?
+                // Dashboard uses selected date range. Admin doesn't have date range pickers in UI yet.
+                // Let's assume current month for now or derive from the most recent record.
+
+                let targetDate = new Date();
+                if (records.length > 0) {
+                    try {
+                        // timestamps are "YYYY-MM-DD HH:MM:SS"
+                        targetDate = new Date(records[0].timestamp.replace(" ", "T"));
+                    } catch (e) { }
+                }
+
+                const monthStr = monthNames[targetDate.getMonth()];
+                const yearStr = targetDate.getFullYear();
+                const centerX = 297 / 2;
+
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "bold");
+                const center = (txt, y) => doc.text(txt, centerX, y, { align: "center" });
+
+                center("GOVERNO DO ESTADO DO ESPÍRITO SANTO", 8);
+                center("SECRETARIA DE ESTADO DA EDUCAÇÃO", 12);
+                center("SRE CARAPINA", 16);
+                doc.setFontSize(11);
+                center("Apuração Diária de Frequência", 22);
+                doc.setFontSize(8);
+                doc.text("SIARHES", 285, 8, { align: "right" });
+
+                const yInfo = 28;
+                doc.setFontSize(9);
+                const col1 = 15, col2 = 100, col3 = 160, col4 = 220;
+                doc.text(`Servidor(a): ${userName}`, col1, yInfo);
+                doc.text(`Matrícula: ${matricula}`, col2, yInfo);
+                doc.text(`Mês/Ano: ${monthStr} / ${yearStr}`, col3, yInfo);
+                doc.text(`Cargo: ${userCargo}`, col4, yInfo);
+
+                const dStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+                const dEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0);
+                const fmt = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+                const reportData = [];
+
+                for (let d = new Date(dStart); d <= dEnd; d.setDate(d.getDate() + 1)) {
+                    const dayStr = fmt(d);
+                    const dayRecords = records.filter(r => r.timestamp.startsWith(dayStr));
+                    const getTime = (type) => {
+                        const match = dayRecords.find(r => r.type === type);
+                        return match ? match.timestamp.split(' ')[1].substring(0, 5) : "";
+                    };
+
+                    let row = [
+                        d.getDate().toString(),
+                        getTime('Entrada'), "", getTime('Saída Almoço'), "",
+                        getTime('Volta Almoço'), "", getTime('Saída'), ""
+                    ];
+
+                    const dayOfWeek = d.getDay();
+                    if ((dayOfWeek === 0 || dayOfWeek === 6) && dayRecords.length === 0) {
+                        row = [d.getDate().toString(), dayOfWeek === 0 ? "DOMINGO" : "SÁBADO"];
+                    }
+                    reportData.push(row);
+                }
+
+                doc.autoTable({
+                    startY: 32,
+                    margin: { left: 10, right: 10, bottom: 15 },
+                    pageBreak: 'avoid',
+                    showHead: 'everyPage',
+                    head: [
+                        [
+                            { content: 'DIA', rowSpan: 2, styles: { valign: 'middle', halign: 'center' } },
+                            { content: 'HORÁRIO MANHÃ', colSpan: 4, styles: { halign: 'center', fillColor: [220, 220, 220] } },
+                            { content: 'HORÁRIO TARDE', colSpan: 4, styles: { halign: 'center', fillColor: [220, 220, 220] } }
+                        ],
+                        ['ENTRADA', 'ASSINATURA', 'SAÍDA', 'ASSINATURA', 'ENTRADA', 'ASSINATURA', 'SAÍDA', 'ASSINATURA'].map(t => ({ content: t, styles: { halign: 'center' } }))
+                    ],
+                    body: reportData,
+                    theme: 'grid',
+                    styles: { fontSize: 7, cellPadding: 0.5, lineColor: [0, 0, 0], lineWidth: 0.1, textColor: [0, 0, 0], minCellHeight: 3.5, valign: 'middle' },
+                    headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold', lineWidth: 0.1, minCellHeight: 4, fontSize: 7 },
+                    columnStyles: {
+                        0: { cellWidth: 9, halign: 'center' },
+                        1: { cellWidth: 15, halign: 'center' },
+                        2: { cellWidth: 51, halign: 'center' },
+                        3: { cellWidth: 15, halign: 'center' },
+                        4: { cellWidth: 51, halign: 'center' },
+                        5: { cellWidth: 15, halign: 'center' },
+                        6: { cellWidth: 51, halign: 'center' },
+                        7: { cellWidth: 15, halign: 'center' },
+                        8: { cellWidth: 51, halign: 'center' }
+                    },
+                    didParseCell: function (data) {
+                        if (data.section === 'body' && data.column.index === 1 && data.row.raw.length === 2) {
+                            data.cell.colSpan = 8;
+                            data.cell.styles.halign = 'center';
+                            data.cell.styles.fillColor = [240, 240, 240];
+                        }
+                    }
+                });
+
+                let finalY = doc.lastAutoTable.finalY + 10;
+                if (finalY < 180) finalY = 180;
+                if (finalY > 195) finalY = 195;
+
+                doc.setLineWidth(0.1);
+                doc.setFontSize(8);
+                const line = (x1, x2, txt, y) => { doc.line(x1, y, x2, y); doc.text(txt, (x1 + x2) / 2, y + 3, { align: 'center' }); };
+
+                line(40, 110, "ASSINATURA DO SERVIDOR", finalY);
+                line(180, 250, "ASSINATURA DA CHEFIA IMEDIATA", finalY);
+
+                doc.save(`Frequencia_${monthStr}_${userName}.pdf`);
+
+            } catch (error) {
+                console.error(error);
+                alert("Erro ao gerar PDF: " + error.message);
+            } finally {
+                document.body.style.cursor = 'default';
+            }
+        }    </script>
+</body>
+
+</html>

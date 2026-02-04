@@ -1,0 +1,9 @@
+Flask
+flask_cors
+bcrypt
+pyjwt
+python-dotenv
+pytz
+openpyxl
+pyodbc
+pymssql
