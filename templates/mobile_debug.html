@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico Mobile</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+
+        .card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 16px;
+            width: 100%;
+            margin: 5px 0;
+        }
+
+        .log {
+            background: #333;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            min-height: 100px;
+        }
+
+        .status {
+            font-weight: bold;
+        }
+
+        .ok {
+            color: green;
+        }
+
+        .err {
+            color: red;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🛠️ Diagnóstico</h1>
+
+    <div class="card">
+        <h3>1. Configuração Atual</h3>
+        <div id="configInfo">Carregando config.js...</div>
+    </div>
+
+    <div class="card">
+        <h3>2. Testes de Conexão</h3>
+        <button onclick="testNtfy()">Testar Ntfy (Sinal)</button>
+        <button onclick="testTunnel()">Testar Túnel Direto</button>
+        <button onclick="testLocal()">Testar IP Local</button>
+    </div>
+
+    <div class="card">
+        <h3>Logs Detalhados</h3>
+        <div id="logs" class="log"></div>
+        <button onclick="document.getElementById('logs').innerHTML=''" style="background:#555; margin-top:10px;">Limpar
+            Logs</button>
+    </div>
+
+    <script src="config.js?t=1"></script>
+    <script>
+        const logDiv = document.getElementById('logs');
+        function log(msg, type = 'info') {
+            const color = type === 'error' ? '🔴' : (type === 'success' ? '✅' : 'ℹ️');
+            const time = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${time}] ${color} ${msg}\n`;
+        }
+
+        // Exibir config
+        try {
+            let html = "<strong>Candidates:</strong><br>";
+            API_CANDIDATES.forEach(c => html += `- ${c}<br>`);
+            html += `<br><strong>Discovery ID:</strong> ${DISCOVERY_ID}`;
+            document.getElementById('configInfo').innerHTML = html;
+        } catch (e) {
+            document.getElementById('configInfo').innerHTML = "<span class='err'>Erro ao ler config.js: " + e.message + "</span>";
+        }
+
+        async function fetchWithTimeout(url, timeout = 5000) {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeout);
+            try {
+                const res = await fetch(url, { signal: controller.signal });
+                clearTimeout(id);
+                return res;
+            } catch (e) {
+                clearTimeout(id);
+                throw e;
+            }
+        }
+
+        async function testNtfy() {
+            log("Iniciando teste Ntfy...", "info");
+            try {
+                const url = `https://ntfy.sh/ponto_carapina_${DISCOVERY_ID}/raw?since=all&t=${Date.now()}`;
+                log(`GET ${url}`);
+                const start = Date.now();
+                const res = await fetchWithTimeout(url, 5000);
+                const ms = Date.now() - start;
+
+                if (res.ok) {
+                    const text = await res.text();
+                    log(`Sucesso (${ms}ms)! Resposta:\n${text}`, "success");
+                } else {
+                    log(`Erro HTTP ${res.status}: ${res.statusText}`, "error");
+                }
+            } catch (e) {
+                log(`Exceção: ${e.name}: ${e.message}`, "error");
+            }
+        }
+
+        async function testTunnel() {
+            log("Testando PRIMEIRO candidato do config...", "info");
+            if (!API_CANDIDATES || API_CANDIDATES.length === 0) return log("Sem candidatos", "error");
+
+            const url = API_CANDIDATES[0];
+            const target = `${url}/api/online?cb=${Math.random()}`;
+            log(`GET ${target}`);
+
+            try {
+                const start = Date.now();
+                const res = await fetchWithTimeout(target, 8000);
+                const ms = Date.now() - start;
+                if (res.ok) {
+                    const json = await res.json();
+                    log(`Sucesso (${ms}ms)! Online: ${json.online}`, "success");
+                } else {
+                    log(`Erro HTTP ${res.status}`, "error");
+                }
+            } catch (e) {
+                log(`Falha: ${e.message}`, "error");
+            }
+        }
+
+        async function testLocal() {
+            const local = "http://192.168.15.10:5005/api/online";
+            log(`Testando IP Local: ${local}`);
+            try {
+                const res = await fetchWithTimeout(local, 2000);
+                if (res.ok) log("IP Local OK!", "success");
+                else log("IP Local respondeu com erro", "error");
+            } catch (e) {
+                log("IP Local inacessível (" + e.message + ")", "error");
+            }
+        }
+    </script>
+</body>
+
+</html>

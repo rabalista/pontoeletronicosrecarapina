@@ -88,6 +88,11 @@
                                     Saída</button>
                             </div>
                         </div>
+                        <div class="row g-2 mt-2">
+                            <div class="col-12 d-grid">
+                                <button class="btn btn-outline-secondary" onclick="openRetroactiveModal()">⚠️ Esqueci de Bater / Ponto Anterior</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -109,6 +114,8 @@
                             </div>
                             <div class="col-md-4">
                                 <div class="d-grid gap-2">
+                                    <button class="btn btn-outline-danger" onclick="downloadEDocsReport()">Baixar
+                                        Relatório E-DOCS (PDF)</button>
                                     <button class="btn btn-outline-primary" onclick="downloadSiahresReport()">Baixar
                                         Relatório SIAHRES (PDF)</button>
                                     <button class="btn btn-secondary" onclick="downloadMyReport()">Baixar Excel
@@ -136,6 +143,50 @@
             </div>
         </div>
     </div>
+
+    <!-- Retroactive Punch Modal -->
+    <div class="modal fade" id="retroactiveModal" tabindex="-1" aria-labelledby="retroactiveModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title" id="retroactiveModalLabel">Registrar Ponto Anterior</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="retroactiveForm" onsubmit="submitRetroactivePunch(event)">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Data e Hora que deveria ter batido</label>
+                            <input type="datetime-local" class="form-control" id="retroDatetime" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Tipo do Ponto</label>
+                            <select class="form-select" id="retroType" required>
+                                <option value="Entrada">Entrada</option>
+                                <option value="Saída Almoço">Saída Almoço</option>
+                                <option value="Volta Almoço">Volta Almoço</option>
+                                <option value="Saída">Saída</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Justificativa / Motivo</label>
+                            <textarea class="form-control" id="retroJustification" rows="3" required placeholder="Esqueci de bater, estava em atendimento, etc..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Anexo (Atestado / Documento) <small class="text-muted">(Opcional)</small></label>
+                            <input class="form-control" type="file" id="retroDocument" accept="image/*,application/pdf">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" id="btnRetroSubmit">Salvar Registro</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
 
     <script src="config.js?v=7.2"></script>
     <script>
@@ -578,6 +629,64 @@
             }
         }
 
+        // --- Retroactive Logic ---
+        function openRetroactiveModal() {
+            let myModal = new bootstrap.Modal(document.getElementById('retroactiveModal'));
+            document.getElementById('retroactiveForm').reset();
+            // Default to today at 08:00
+            const now = new Date();
+            const dStr = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,'0') + "-" + String(now.getDate()).padStart(2,'0') + "T08:00";
+            document.getElementById('retroDatetime').value = dStr;
+            myModal.show();
+        }
+
+        async function submitRetroactivePunch(event) {
+            event.preventDefault();
+            const btn = document.getElementById('btnRetroSubmit');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Enviando...';
+
+            const token = localStorage.getItem('ponto_token');
+            const dt = document.getElementById('retroDatetime').value;
+            const type = document.getElementById('retroType').value;
+            const justification = document.getElementById('retroJustification').value;
+            const fileInput = document.getElementById('retroDocument');
+
+            const formData = new FormData();
+            formData.append('datetime', dt);
+            formData.append('type', type);
+            formData.append('justification', justification);
+            
+            if (fileInput.files.length > 0) {
+                formData.append('document', fileInput.files[0]);
+            }
+
+            try {
+                if (window.API_READY) await window.API_READY;
+                const response = await fetch((window.API_BASE_URL || '') + `/api/punch/retroactive`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }, // Do not set Content-Type; FormData sets it with boundary
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    alert('Ponto retroativo salvo com sucesso!');
+                    bootstrap.Modal.getInstance(document.getElementById('retroactiveModal')).hide();
+                    loadHistory();
+                } else {
+                    const errJs = await response.json().catch(() => ({}));
+                    alert("Erro ao registrar ponto retroativo: " + (errJs.message || response.statusText));
+                }
+            } catch (error) {
+                alert("Erro de conexão ao tentar salvar.");
+                console.error(error);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Salvar Registro';
+            }
+        }
+        // -------------------------
+
         // v4.7: Robust matricula extraction
         function getMatricula() {
             let m = localStorage.getItem('user_matricula');
@@ -703,9 +812,27 @@
             });
 
             monthlyRecords.forEach(r => {
-                const pendingBadge = r.pending ? `<span class="badge bg-warning text-dark ms-2">pendente</span>` : '';
+                let suffix = "";
+                if (r.pending) suffix += `<span class="badge bg-warning text-dark ms-2">pendente</span>`;
+                if (r.is_retroactive) {
+                    if (r.is_reviewed) {
+                        suffix += `<span class="badge bg-secondary ms-2" title="${r.justification}">Ajuste Manual</span>`;
+                    } else {
+                        suffix += `<span class="badge bg-warning text-dark ms-2" title="Aguardando aprovação do administrador">Aguardando Aprovação</span>`;
+                    }
+                }
+                if (r.document_path) {
+                    // Safe logic to make sure the endpoint works or at least it opens a local file link
+                    let cleanPath = r.document_path;
+                    if (cleanPath.startsWith('static/')) cleanPath = cleanPath.substring(7); // if the backend saved it as static/uploads/..., serve from /static/
+                    
+                    // Se o frontend roda pelo site_para_cloudflare separar backend/frontend:
+                    const backendURL = window.API_BASE_URL ? window.API_BASE_URL.replace(/\/$/, '') : '';
+                    suffix += ` <a href="${backendURL}/static/${cleanPath}" target="_blank" class="badge bg-light text-dark text-decoration-none" title="Ver Anexo">📎 Anexo</a>`;
+                }
+                
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${r.type}${pendingBadge}</td><td>${r.timestamp}</td><td>${r.neighborhood || '-'}</td><td>${r.city || '-'}</td>`;
+                tr.innerHTML = `<td>${r.type}${suffix}</td><td>${r.timestamp}</td><td>${r.neighborhood || '-'}</td><td>${r.city || '-'}</td>`;
                 tbody.appendChild(tr);
             });
         }
@@ -858,6 +985,212 @@
         }
 
 
+        async function downloadEDocsReport() {
+            if (!window.jspdf) { alert("Biblioteca PDF carregando..."); return; }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'portrait', format: 'a4' });
+
+            const logo = new Image();
+            logo.src = 'brasao.png'; 
+            try {
+                await new Promise((resolve) => {
+                    if (logo.complete) return resolve();
+                    logo.onload = resolve;
+                    logo.onerror = resolve;
+                });
+                doc.addImage(logo, 'PNG', 10, 5, 18, 22);
+            } catch (e) {
+                console.warn("Logo loading failed", e);
+            }
+
+            const userName = localStorage.getItem('user_name') || "Servidor";
+            const matricula = localStorage.getItem('matricula') || getMatricula() || "";
+            const s = document.getElementById('startDate').value;
+            let reportDate = new Date();
+            if (s) reportDate = new Date(s + "T12:00:00");
+
+            const monthStr = String(reportDate.getMonth() + 1).padStart(2, '0');
+            const yearStr = reportDate.getFullYear();
+
+            // Header Texts
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.text("ESTADO DO ESPIRITO SANTO", 35, 12);
+            doc.text("ESPIRITO SANTO SECRETARIA DE ESTADO DA EDUCACAO - SEDU", 35, 17);
+            
+            // Container for Frequência
+            doc.setLineWidth(0.2);
+            doc.setDrawColor(150, 150, 150); 
+            doc.setFontSize(11);
+            doc.setFont("helvetica", "bold");
+            doc.text(`FREQUÊNCIA - ${monthStr}/${yearStr}`, 105, 30, { align: "center" });
+
+            doc.line(10, 33, 200, 33);
+            doc.setFontSize(10);
+            doc.text("DADOS PESSOAIS", 10, 37);
+            doc.line(10, 39, 200, 39);
+            
+            doc.setFont("helvetica", "bold");
+            doc.text(`Nome:`, 10, 44);
+            doc.setFont("helvetica", "normal");
+            doc.text(userName.toUpperCase(), 23, 44);
+            doc.setFont("helvetica", "bold");
+            doc.text(`Nº Funcional:`, 150, 44);
+            doc.setFont("helvetica", "normal");
+            doc.text(matricula, 175, 44);
+            
+            doc.line(10, 46, 200, 46);
+            
+            doc.setFont("helvetica", "bold");
+            doc.text(`Órgão/Setor:`, 10, 51);
+            doc.setFont("helvetica", "normal");
+            doc.text(`SEDU - SRECARAP`, 35, 51);
+            
+            doc.line(10, 53, 200, 53);
+            
+            doc.setFont("helvetica", "bold");
+            doc.text(`Cargo:`, 10, 58);
+            doc.setFont("helvetica", "normal");
+            const userCargo = localStorage.getItem('user_cargo') || "AGENTE DE SUPORTE EDUCACIONAL";
+            doc.text(userCargo.toUpperCase(), 25, 58);
+            
+            doc.line(10, 60, 200, 60);
+
+            let records = [];
+            document.body.style.cursor = 'wait';
+            try {
+                const y = reportDate.getFullYear();
+                const m = reportDate.getMonth();
+                const startStr = s || new Date(y, m, 1).toISOString().split('T')[0];
+                const endStr = document.getElementById('endDate').value || new Date(y, m + 1, 0).toISOString().split('T')[0];
+
+                const token = localStorage.getItem('ponto_token');
+                if (window.API_READY) await window.API_READY;
+                const url = `/api/history?start_date=${startStr}&end_date=${endStr}`;
+                const response = await apiFetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    records = Array.isArray(data) ? data : (data.records || []);
+                } else {
+                    const cacheKey = 'cachedServerHistory_' + (getMatricula() || 'anon');
+                    const cached = localStorage.getItem(cacheKey);
+                    if (cached) records = JSON.parse(cached);
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Erro ao buscar dados.");
+            }
+            document.body.style.cursor = 'default';
+
+            const dStart = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1);
+            const dEnd = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0);
+            const fmt = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+            const mmdd = (d) => String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+            const reportData = [];
+
+            const holidaysModel = {
+                "01-01": "Feriado nacional - Confraternização Universal",
+                "04-03": "Feriado nacional - Paixão de Cristo - Amparado pelo art.1º do Decreto Nº 124-S, de 22/01/2026.",
+                "04-13": "Feriado estadual - Nossa Senhora da Penha - Amparado pelo art. 1º do Decreto Nº 124-S, de 22/01/2026.",
+                "04-21": "Feriado nacional - Tiradentes - Amparado pelo art. 1º do Decreto Nº 124-S, de 22/01/2026.",
+                "05-01": "Feriado nacional - Dia do Trabalhador",
+                "09-07": "Feriado nacional - Independência do Brasil",
+                "10-12": "Feriado nacional - Nossa Sra. Aparecida",
+                "11-02": "Feriado nacional - Finados",
+                "11-15": "Feriado nacional - Proclamação da República",
+                "12-25": "Feriado nacional - Natal"
+            };
+
+            const dayNames = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+
+            for (let d = new Date(dStart); d <= dEnd; d.setDate(d.getDate() + 1)) {
+                const dayStr = fmt(d);
+                const mdStr = mmdd(d);
+                const dayRecords = records.filter(r => r.timestamp.startsWith(dayStr));
+                const getTime = (type) => {
+                    const match = dayRecords.find(r => r.type === type);
+                    return match ? match.timestamp.split(' ')[1].substring(0, 5) : "";
+                };
+
+                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                const isHoliday = holidaysModel[mdStr];
+                
+                let obs = "";
+                let e1 = getTime('Entrada'), s1 = getTime('Saída Almoço');
+                let e2 = getTime('Volta Almoço'), s2 = getTime('Saída');
+
+                if (isHoliday) {
+                    obs = isHoliday;
+                    e1 = " -- "; s1 = " -- "; e2 = " -- "; s2 = " -- ";
+                } else if (isWeekend && !e1 && !s1 && !e2 && !s2) {
+                    e1 = " -- "; s1 = " -- "; e2 = " -- "; s2 = " -- ";
+                }
+
+                reportData.push([
+                    d.getDate().toString(),
+                    dayNames[d.getDay()],
+                    e1, s1, e2, s2, obs
+                ]);
+            }
+
+            doc.autoTable({
+                startY: 64,
+                margin: { left: 10, right: 10, bottom: 10 }, 
+                head: [
+                    [
+                        { content: 'APURAÇÃO DIÁRIA', colSpan: 7, styles: { halign: 'center', fillColor: [240, 240, 240], textColor: [0,0,0], fontStyle: 'bold' } }
+                    ],
+                    [
+                        { content: 'Data', rowSpan: 2, colSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [255, 255, 255], textColor: [0,0,0] } },
+                        { content: '1º Expediente', colSpan: 2, styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0,0,0] } },
+                        { content: '2º Expediente', colSpan: 2, styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0,0,0] } },
+                        { content: 'Observações', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [255, 255, 255], textColor: [0,0,0] } }
+                    ],
+                    [
+                        { content: 'Entrada', styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0,0,0] } },
+                        { content: 'Saída', styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0,0,0] } },
+                        { content: 'Entrada', styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0,0,0] } },
+                        { content: 'Saída', styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0,0,0] } }
+                    ]
+                ],
+                body: reportData,
+                theme: 'grid',
+                styles: {
+                    fontSize: 7,
+                    cellPadding: 0.8,
+                    textColor: [0, 0, 0],
+                    lineColor: [150, 150, 150],
+                    lineWidth: 0.1,
+                    valign: 'middle'
+                },
+                columnStyles: {
+                    0: { cellWidth: 8, halign: 'center' }, // Day num
+                    1: { cellWidth: 10, halign: 'center' }, // Day name
+                    2: { cellWidth: 16, halign: 'center' }, // Ent 1
+                    3: { cellWidth: 16, halign: 'center' }, // Sai 1
+                    4: { cellWidth: 16, halign: 'center' }, // Ent 2
+                    5: { cellWidth: 16, halign: 'center' }, // Sai 2
+                    6: { cellWidth: 'auto', halign: 'left' }  // Obs
+                }
+            });
+
+            let finalY = doc.lastAutoTable.finalY + 12;
+            if (finalY > 280) {
+                doc.addPage();
+                finalY = 30;
+            }
+
+            doc.setFontSize(8);
+            doc.text(userName.toUpperCase(), 60, finalY + 4, { align: 'center' });
+            doc.text("(assinado eletronicamente)", 60, finalY + 8, { align: 'center' });
+            
+            doc.text("TIAGO GUERCON DA SILVA", 150, finalY + 4, { align: 'center' }); 
+            doc.text("(assinado eletronicamente)", 150, finalY + 8, { align: 'center' });
+
+            doc.save(`Frequencia_EDOCS_${monthStr}_${yearStr}_${userName.substring(0,10)}.pdf`);
+        }
+
         async function downloadSiahresReport() {
             if (!window.jspdf) { alert("Biblioteca PDF carregando..."); return; }
             const { jsPDF } = window.jspdf;
@@ -866,7 +1199,7 @@
 
             // Logo (Brasao) - Load async
             const logo = new Image();
-            logo.src = 'brasao.png';
+            logo.src = 'brasao.png'; // Path for Cloudflare static site (same directory)
             try {
                 await new Promise((resolve) => {
                     if (logo.complete) return resolve();
@@ -948,13 +1281,28 @@
             const dEnd = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0);
             const fmt = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
             const reportData = [];
+            const justifications = []; // To store retroactive justifications
 
             for (let d = new Date(dStart); d <= dEnd; d.setDate(d.getDate() + 1)) {
                 const dayStr = fmt(d);
                 const dayRecords = records.filter(r => r.timestamp.startsWith(dayStr));
+                
                 const getTime = (type) => {
                     const match = dayRecords.find(r => r.type === type);
-                    return match ? match.timestamp.split(' ')[1].substring(0, 5) : "";
+                    if (!match) return "";
+                    
+                    // IF retroactive, only show if approved
+                    if (match.is_retroactive && !match.is_reviewed) return "";
+
+                    let time = match.timestamp.split(' ')[1].substring(0, 5);
+                    if (match.is_retroactive) {
+                        time += "*";
+                        const existing = justifications.find(j => j.day === d.getDate());
+                        if (!existing) {
+                            justifications.push({ day: d.getDate(), text: match.justification || 'Ajuste Manual' });
+                        }
+                    }
+                    return time;
                 };
 
                 let row = [
@@ -1038,6 +1386,22 @@
 
             line(40, 110, "ASSINATURA DO SERVIDOR", finalY);
             line(180, 250, "ASSINATURA DA CHEFIA IMEDIATA", finalY);
+
+            // Observations Section
+            if (justifications.length > 0) {
+                let obsY = finalY + 15;
+                if (obsY > 200) {
+                    doc.addPage();
+                    obsY = 20;
+                }
+                doc.setFontSize(8);
+                doc.setFont("helvetica", "bold");
+                doc.text("(*) OBSERVAÇÕES / JUSTIFICATIVAS:", 10, obsY);
+                doc.setFont("helvetica", "normal");
+                justifications.forEach((j, idx) => {
+                    doc.text(`- Dia ${j.day}: ${j.text}`, 10, obsY + 5 + (idx * 4));
+                });
+            }
 
             doc.save(`Frequencia_${monthStr}_${userName}.pdf`);
         }

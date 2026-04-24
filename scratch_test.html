@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        window.onload = function() {
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                var sign1 = new window.jspdf.AcroFormTextField();
+                sign1.Rect = [30, 20, 60, 10];
+                sign1.value = "TESTE NOME";
+                sign1.textAlign = 'center';
+                doc.addField(sign1);
+                console.log("SUCCESS_ACROFORM");
+                document.body.innerHTML = "SUCCESS_ACROFORM";
+            } catch (e) {
+                console.log("FAIL_ACROFORM: " + e.message);
+                document.body.innerHTML = "FAIL_ACROFORM: " + e.message;
+            }
+        };
+    </script>
+</head>
+<body>WAITING</body>
+</html>

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Ponto Eletrônico - Estado do Espírito Santo</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed": "#cfe5ff",
+                        "on-tertiary-fixed": "#2c1700",
+                        "tertiary-fixed": "#ffdcbc",
+                        "inverse-on-surface": "#f0f1f2",
+                        "tertiary": "#7d4b00",
+                        "secondary-container": "#ffb0cb",
+                        "on-primary": "#ffffff",
+                        "secondary-fixed-dim": "#ffb0cb",
+                        "primary-container": "#2d73aa",
+                        "on-tertiary-fixed-variant": "#683d00",
+                        "on-surface-variant": "#424751",
+                        "background": "#f8f9fa",
+                        "outline-variant": "#c2c6d2",
+                        "outline": "#727782",
+                        "on-primary-fixed-variant": "#004a77",
+                        "on-primary-fixed": "#001d33",
+                        "surface-bright": "#f8f9fa",
+                        "on-secondary-fixed": "#38081f",
+                        "on-error-container": "#93000a",
+                        "surface-dim": "#d9dadb",
+                        "on-secondary-fixed-variant": "#6d344a",
+                        "tertiary-container": "#9f6000",
+                        "surface-variant": "#e1e3e4",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#2e3132",
+                        "secondary": "#894b62",
+                        "error": "#ba1a1a",
+                        "primary-fixed-dim": "#98cbff",
+                        "surface": "#f8f9fa",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-container": "#7b3f56",
+                        "surface-container-highest": "#e1e3e4",
+                        "inverse-primary": "#98cbff",
+                        "surface-container-high": "#e7e8e9",
+                        "on-error": "#ffffff",
+                        "on-surface": "#191c1d",
+                        "surface-container-low": "#f3f4f5",
+                        "surface-container": "#edeeef",
+                        "primary": "#005a8f",
+                        "on-tertiary-container": "#fff0e4",
+                        "on-background": "#191c1d",
+                        "secondary-fixed": "#ffd9e3",
+                        "tertiary-fixed-dim": "#ffb86a",
+                        "surface-tint": "#136299",
+                        "on-primary-container": "#ebf3ff",
+                        "error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass-effect { backdrop-filter: blur(20px); }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .ghost-border { border: 1px solid rgba(194, 198, 210, 0.15); }
+        .custom-gradient { background: linear-gradient(135deg, #005a8f 0%, #2d73aa 100%); }
+        .bg-pastel-gradient {
+            background: linear-gradient(135deg, #f0f7ff 0%, #fff1f6 100%);
+            background-size: cover;
+            background-attachment: fixed;
+        }
+        .rounded-input:focus {
+            border-radius: 1.25rem !important;
+            box-shadow: 0 0 0 2px #98cbff !important;
+        }
+    </style>
+</head>
+<body class="bg-pastel-gradient text-on-surface min-h-screen flex flex-col items-center justify-center font-body">
+
+<div id="loginScreen" class="w-full flex-grow flex flex-col items-center justify-center">
+<main class="w-full flex-grow flex flex-col items-center justify-center px-4 py-4 max-w-[1200px]">
+<!-- Header / Logo Area -->
+<header class="flex flex-col items-center mb-4 text-center w-full max-w-[420px]">
+<div class="w-20 h-20 mb-4 overflow-hidden flex items-center justify-center">
+<img alt="Brasão do Governo do Estado do Espírito Santo" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida/ADBb0ujwUXmAORF3-O0cLGLsIa-4E53iDzP0DNXrwCgMPyGj5uz1iSpRcxp_a-wlm4EVx27ummyBLP-HinfBNpWEj9GN7kGPvpliicD15dU3KBxh5CzMMTm1XSSNnI-ORvaQoCMhBaOJbUgDxCighhv06iydT1H_iHVT6IQr4OkGIUFQUelbJnR5FTzJYY-bEPj2S1Snndvhrw8ctzrMbFQSJ3FZ9a7ft0MVMqNgRdmRePNGqhwsLKqpk0s24kYBC1jrNidvI5vPy4DKqQ" onerror="this.src='https://cdn.es.gov.br/images/logo/governo/brasao/center/Brasao_Governo_500.png'"/>
+</div>
+<!-- Digital Clock Hero Section -->
+<div class="space-y-1 w-full text-center">
+<h1 class="text-5xl font-black tracking-tighter text-primary-container font-headline" id="fastClock">
+                    00:00:00
+                </h1>
+<p class="text-on-surface-variant text-[10px] uppercase font-bold tracking-[0.2em] opacity-80" id="fastDate">
+                    Carregando data...
+                </p>
+</div>
+</header>
+<!-- Main Form Container -->
+<div class="w-full max-w-[420px] bg-surface-container-lowest rounded-[2rem] shadow-[0_15px_30px_rgba(25,28,29,0.05)] ghost-border overflow-hidden p-4 md:p-6 mb-4 transition-all duration-300">
+<!-- Tab Switcher -->
+<div class="flex p-1 bg-surface-container-high rounded-[1.2rem] mb-4">
+<button class="flex-1 py-2 px-1 rounded-[1rem] text-xs font-bold transition-all bg-surface-container-lowest text-primary shadow-sm" id="tabRegister" onclick="switchTab('register')">
+                    Registro Rápido
+                </button>
+<button class="flex-1 py-2 px-1 rounded-[1.2rem] text-xs font-bold transition-all text-on-surface-variant hover:text-on-surface" id="tabLogin" onclick="switchTab('login')">
+                    Login do Servidor
+                </button>
+</div>
+<!-- Forms Container -->
+<div class="px-1 md:px-2">
+<!-- Fast Punch Form -->
+<form class="space-y-4 block" id="fastForm">
+<div class="space-y-3">
+<div class="space-y-1">
+<label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Tipo de Registro</label>
+<div class="relative">
+<select class="w-full bg-surface-container-high border-none rounded-[1rem] h-11 px-4 appearance-none focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" id="fastType" required="">
+<option disabled="" selected="" value="">-- Selecione --</option>
+<option value="Entrada">Entrada</option>
+<option value="Saída Almoço">Saída para Almoço</option>
+<option value="Volta Almoço">Volta do Almoço</option>
+<option value="Saída">Saída</option>
+<option value="3º Turno - Saída Extra">3º Turno - Saída Extra</option>
+<option value="3º Turno - Entrada Extra">3º Turno - Entrada Extra</option>
+<option value="Atestado (Dia Todo)">Atestado (Dia Todo)</option>
+<option value="Abono (Dia Todo)">Abono (Dia Todo)</option>
+<option value="Uso de Saldo/Compensação">Uso de Saldo/Compensação</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-lg">expand_more</span>
+</div>
+</div>
+<div class="space-y-1">
+<label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Matrícula</label>
+<input class="w-full bg-surface-container-high border-none rounded-[1rem] h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" id="fastMatricula" placeholder="Ex: 1234567-8" required="" type="text"/>
+</div>
+<div class="space-y-1">
+<label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Senha de Acesso</label>
+<div class="relative">
+<input class="w-full bg-surface-container-high border-none rounded-[1rem] h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" id="fastPassword" placeholder="••••••••" required="" type="password"/>
+<button class="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant" onclick="const p = document.getElementById('fastPassword'); p.type = p.type === 'password' ? 'text' : 'password'" type="button">
+<span class="material-symbols-outlined text-lg">visibility</span>
+</button>
+</div>
+</div>
+</div>
+<button class="w-full custom-gradient text-on-primary h-12 rounded-[1rem] font-bold text-sm shadow hover:scale-[1.01] active:scale-[0.99] transition-transform flex items-center justify-center gap-2 mt-2" id="fastBtn" type="submit">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">fingerprint</span>
+                        <span id="fastBtnText">REGISTRAR PONTO</span>
+                    </button>
+<div id="messageFast" class="mt-2 text-red-500 text-center font-bold text-[10px]"></div>
+</form>
+<!-- Server Login Form (Hidden by default) -->
+<form class="space-y-4 hidden" id="loginForm">
+<div class="space-y-3">
+<div class="space-y-1">
+<label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Matrícula</label>
+<input class="w-full bg-surface-container-high border-none rounded-[1rem] h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" id="matricula" placeholder="Sua matrícula" required="" type="text"/>
+</div>
+<div class="space-y-1">
+<label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Senha</label>
+<input class="w-full bg-surface-container-high border-none rounded-[1rem] h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" id="password" placeholder="••••••••" required="" type="password"/>
+</div>
+</div>
+<button class="w-full bg-primary text-on-primary h-12 rounded-[1rem] font-bold text-sm shadow hover:scale-[1.01] active:scale-[0.99] transition-transform flex items-center justify-center gap-2 mt-2" id="loginBtn" type="submit">
+<span class="material-symbols-outlined text-lg">login</span>
+                        <span id="loginBtnText">ENTRAR NO SISTEMA</span>
+                    </button>
+<div class="text-center pt-2">
+<a class="text-primary font-bold text-[10px] hover:underline" href="register.html">Cadastrar novo acesso</a>
+</div>
+<div id="message" class="mt-2 text-red-500 text-center font-bold text-[10px]"></div>
+</form>
+<div class="text-center mt-3" id="forgotPass">
+<a class="text-primary font-bold text-[10px] hover:underline" href="#">Esqueci minha senha</a>
+</div>
+</div>
+</div>
+<footer class="mt-8 pb-8 text-center text-on-surface-variant font-bold tracking-[0.2em] uppercase text-[9px] opacity-80">
+            SRE CARAPINA / GTI
+        </footer>
+</main>
+</div>
+
+<!-- RADAR SCREEN (Hidden) -->
+<div id="radarScreen" class="text-center hidden fixed top-0 left-0 w-full h-full bg-white/95 z-50 flex-col justify-center items-center">
+    <div class="bg-primary/10 p-10 rounded-full mb-6">
+        <span class="material-symbols-outlined text-primary text-5xl animate-pulse">radar</span>
+    </div>
+    <h3 class="text-primary text-2xl font-bold mb-2">Procurando Servidor...</h3>
+    <div id="radarStatus" class="font-bold mb-3 text-primary text-sm">Buscando Sinal...</div>
+    <div id="radarLogs" class="text-left bg-gray-900 text-green-400 p-3 mb-3 rounded-lg text-[10px] min-h-[120px] font-mono overflow-y-auto w-11/12 max-w-sm"></div>
+    <div class="flex flex-col gap-2 w-11/12 max-w-sm">
+        <input type="text" id="manualApi" class="px-4 py-2 text-xs border rounded-lg bg-gray-100" placeholder="Link Manual (https://...)">
+        <button class="bg-primary text-white py-2 rounded-lg text-xs font-bold" onclick="window.setManualApi()">CONECTAR AGORA</button>
+        <button onclick="window.clearCache()" class="text-red-600 text-[10px] font-bold mt-2">LIMPAR CACHE</button>
+    </div>
+</div>
+
+<script src="config.js?t=20260118"></script>
+<script>
+    function switchTab(tab) {
+        const f = document.getElementById('fastForm'), l = document.getElementById('loginForm'), tr = document.getElementById('tabRegister'), tl = document.getElementById('tabLogin'), fp = document.getElementById('forgotPass');
+        if (tab === 'register') { f.classList.remove('hidden'); l.classList.add('hidden'); if(fp) fp.classList.remove('hidden'); tr.classList.add('bg-surface-container-lowest','text-primary','shadow-sm'); tr.classList.remove('text-on-surface-variant'); tl.classList.remove('bg-surface-container-lowest','text-primary','shadow-sm'); tl.classList.add('text-on-surface-variant'); } else { f.classList.add('hidden'); l.classList.remove('hidden'); if(fp) fp.classList.add('hidden'); tl.classList.add('bg-surface-container-lowest','text-primary','shadow-sm'); tl.classList.remove('text-on-surface-variant'); tr.classList.remove('bg-surface-container-lowest','text-primary','shadow-sm'); tr.classList.add('text-on-surface-variant'); }
+    }
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const m = document.getElementById('matricula').value, p = document.getElementById('password').value, b = document.getElementById('loginBtn'), t = document.getElementById('loginBtnText'), ri = b.querySelector('.material-symbols-outlined');
+        b.disabled = true; t.innerText = 'ENTRANDO...'; ri.innerText = 'sync'; ri.classList.add('animate-spin'); document.getElementById('message').innerText = "";
+        try {
+            const r = await apiFetch(`/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ matricula: m, password: p }) });
+            if (r && r.ok) { const d = await r.json(); localStorage.setItem('ponto_token', d.token); localStorage.setItem('user_role', d.role); localStorage.setItem('user_name', d.name); localStorage.setItem('user_matricula', m); localStorage.setItem('user_cargo', d.cargo || 'Funcionario'); window.location.href = d.role === 'admin' ? 'admin.html' : 'dashboard.html'; }
+            else { document.getElementById('message').innerText = 'Erro na autenticação'; b.disabled = false; t.innerText = 'ENTRAR NO SISTEMA'; ri.innerText = 'login'; ri.classList.remove('animate-spin'); }
+        } catch { document.getElementById('loginScreen').classList.add('hidden'); document.getElementById('radarScreen').style.display='flex'; if (window.startRadarMode) window.startRadarMode((s) => { document.getElementById('radarStatus').innerHTML = s; }); }
+    });
+    setInterval(() => {
+        const n = new Date(); document.getElementById('fastClock').innerText = n.toLocaleTimeString('pt-BR');
+        const o = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }; let ds = n.toLocaleDateString('pt-BR', o);
+        document.getElementById('fastDate').innerText = ds.charAt(0).toUpperCase() + ds.slice(1);
+    }, 1000);
+    document.getElementById('fastForm').addEventListener('submit', async (e) => {
+        e.preventDefault(); const m = document.getElementById('fastMatricula').value, p = document.getElementById('fastPassword').value, tp = document.getElementById('fastType').value, b = document.getElementById('fastBtn'), t = document.getElementById('fastBtnText'), ri = b.querySelector('.material-symbols-outlined');
+        b.disabled = true; t.innerText = 'LENDO GPS...'; ri.innerText = 'sync'; ri.classList.add('animate-spin');
+        if (!navigator.geolocation) { alert("Sem GPS!"); b.disabled = false; t.innerText = 'REGISTRAR PONTO'; return; }
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            try {
+                const lr = await apiFetch(`/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ matricula: m, password: p }) });
+                if (!lr || !lr.ok) { alert('Senha incorreta!'); } else {
+                    const ld = await lr.json();
+                    
+                    t.innerText = 'OBTENDO ENDEREÇO...';
+                    let geocodedNeighborhood = "Desconhecido";
+                    let geocodedCity = "Vitória - ES";
+                    let fullAddress = "";
+                    const lat = pos.coords.latitude;
+                    const lon = pos.coords.longitude;
+
+                    try {
+                        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, {
+                            headers: { 'User-Agent': 'PontoEletronicoApp/1.2' }
+                        });
+                        const data = await response.json();
+                        const addr = data.address || {};
+                        geocodedCity = (addr.city || addr.town || addr.village || addr.municipality || "Vitória") + " - ES";
+                        geocodedNeighborhood = addr.suburb || addr.neighbourhood || addr.neighbourhood_level2 || addr.hamlet || addr.residential || addr.district || "Desconhecido";
+                        fullAddress = data.display_name;
+                        
+                        // AUTO-CORRECT: Santa Clara -> Jardim da Penha
+                        if (geocodedCity.includes("Vitória") && (geocodedNeighborhood.includes("Santa Clara") || geocodedNeighborhood === "Vitória")) {
+                            geocodedNeighborhood = "Jardim da Penha";
+                        }
+                    } catch (geoError) {
+                        console.warn("Geocoding failed, using coordinates only.");
+                    }
+
+                    t.innerText = 'SALVANDO...';
+                    const pr = await apiFetch(`/api/punch`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ld.token}` }, body: JSON.stringify({ type: tp, latitude: lat, longitude: lon, accuracy: pos.coords.accuracy, neighborhood: geocodedNeighborhood, city: geocodedCity, full_address: fullAddress, transaction_id: 'fast_' + Date.now() }) });
+                    if (pr.ok) { alert(`PONTO REGISTRADO!`); document.getElementById('fastForm').reset(); } else { alert("Erro ao registrar."); }
+                }
+            } catch { alert('Erro de conexão.'); }
+            b.disabled = false; t.innerText = 'REGISTRAR PONTO'; ri.innerText = 'fingerprint'; ri.classList.remove('animate-spin');
+        }, () => { alert("Ative o GPS!"); b.disabled = false; t.innerText = 'REGISTRAR PONTO'; }, { enableHighAccuracy: true, timeout: 15000 });
+    });
+    switchTab('register');
+</script>
+</body>
+</html>

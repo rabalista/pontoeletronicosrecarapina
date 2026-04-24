@@ -8,11 +8,13 @@ import hashlib
 import urllib.request
 import urllib.parse
 import signal
+import platform
 
 # Configuração
 CLOUDFLARE_PAGES_URL = "https://pontowebsrecarapina.rabalista.workers.dev"
 PORT = 5005
 LOCK_FILE = "run_cloudflare.lock"
+IS_WINDOWS = platform.system() == 'Windows'
 
 # Variáveis globais para controle robusto
 CURRENT_PUBLIC_URL = None
@@ -28,49 +30,57 @@ def update_config_js(url):
         except:
             local_ip = "127.0.0.1"
             
+        # Try to find a real IP on Windows
         if local_ip.startswith("127."):
-            try: local_ip = subprocess.check_output("ipconfig getifaddr en0", shell=True).decode().strip()
-            except: 
-                try: local_ip = subprocess.check_output("ipconfig getifaddr en1", shell=True).decode().strip()
-                except: pass
+             try:
+                 # This is a basic attempt, might need more robust logic for Windows if multiple NICs
+                 local_ip = socket.gethostbyname(socket.gethostname())
+             except: pass
         
         local_api = f"http://{local_ip}:{PORT}"
         print(f"   🏠 IP LOCAL DETECTADO: {local_api}")
 
-        config_path = os.path.join("site_para_cloudflare 10", "config.js")
-        if not os.path.exists(config_path): return
+        # Update in static and public folders
+        paths_to_update = [
+            os.path.join("static", "config.js"),
+            os.path.join("public", "config.js"),
+            os.path.join("site_para_cloudflare 10", "config.js")
+        ]
 
-        with open(config_path, "r", encoding="utf-8") as f:
-            content = f.read()
+        for config_path in paths_to_update:
+            if not os.path.exists(config_path): continue
+            
+            with open(config_path, "r", encoding="utf-8") as f:
+                content = f.read()
         
-        top_candidates = [url, local_api]
-        unique_top = []
-        for c in top_candidates:
-            if c and c not in unique_top: unique_top.append(c)
+            top_candidates = [url, local_api]
+            unique_top = []
+            for c in top_candidates:
+                if c and c not in unique_top: unique_top.append(c)
 
-        existing_candidates = []
-        match_list = re.search(r'const API_CANDIDATES = \[(.*?)\];', content, re.DOTALL)
-        if match_list:
-            existing_candidates = [c.strip().strip('"').strip("'") for c in match_list.group(1).split(',')]
-            existing_candidates = [c for c in existing_candidates if c]
+            existing_candidates = []
+            match_list = re.search(r'const API_CANDIDATES = \[(.*?)\];', content, re.DOTALL)
+            if match_list:
+                existing_candidates = [c.strip().strip('"').strip("'") for c in match_list.group(1).split(',')]
+                existing_candidates = [c for c in existing_candidates if c]
 
-        unique_all = []
-        for c in (unique_top + existing_candidates):
-            if c and c not in unique_all and len(unique_all) < 8:
-                unique_all.append(c)
-        
-        candidates_str = "\n".join([f'  "{c}",' for c in unique_all])
-        content = re.sub(r'const API_CANDIDATES = \[.*?\];', 
-                        f'const API_CANDIDATES = [\n{candidates_str}\n];', 
-                        content, flags=re.DOTALL)
-        
-        discovery_id = get_discovery_id()
-        print(f"   🆔 ID de Descoberta: {discovery_id}")
-        content = re.sub(r'const DISCOVERY_ID = ".*?";', f'const DISCOVERY_ID = "{discovery_id}";', content)
-        
-        with open(config_path, "w", encoding="utf-8") as f:
-            f.write(content)
-        print(f"   ✅ Arquivo 'config.js' atualizado!")
+            unique_all = []
+            for c in (unique_top + existing_candidates):
+                if c and c not in unique_all and len(unique_all) < 8:
+                    unique_all.append(c)
+            
+            candidates_str = "\n".join([f'  "{c}",' for c in unique_all])
+            content = re.sub(r'const API_CANDIDATES = \[.*?\];', 
+                            f'const API_CANDIDATES = [\n{candidates_str}\n];', 
+                            content, flags=re.DOTALL)
+            
+            discovery_id = get_discovery_id()
+            print(f"   🆔 ID de Descoberta: {discovery_id}")
+            content = re.sub(r'const DISCOVERY_ID = ".*?";', f'const DISCOVERY_ID = "{discovery_id}";', content)
+            
+            with open(config_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            print(f"   ✅ Arquivo '{config_path}' atualizado!")
     except Exception as e:
         print(f"   ⚠️ Falha ao atualizar config.js: {e}")
 
@@ -120,6 +130,7 @@ def log(msg):
 
 def start_serveo_fallback():
     """Tenta abrir um túnel reserva via Serveo se o Cloudflare demorar."""
+    # Serveo via ssh might rely on 'ssh' being in path (Windows has OpenSSH usually)
     print("🌍 [Reserva] Iniciando túnel Serveo...")
     while True:
         try:
@@ -158,10 +169,11 @@ def get_discovery_id():
         else:
             print("   ⚠️ Arquivo .env não encontrado!")
     except Exception as e:
-        print(f"   ❌ Erro ao ler .env: {e}")
+        # print(f"   ❌ Erro ao ler .env: {e}")
+        pass
     
     final_id = hashlib.sha256(f"registroponto_{secret}".encode()).hexdigest()[:16]
-    print(f"   🆔 ID Calculado: {final_id} (usando '{secret[:3]}...')")
+    # print(f"   🆔 ID Calculado: {final_id} (usando '{secret[:3]}...')")
     return final_id
 
 
@@ -181,7 +193,7 @@ def start_robust_heartbeat():
             if url_to_send:
                 attempts += 1
                 try:
-                    # Ntfy (Principal)
+                    # Ntfy (Principal) - Use curl if available, or python requests if we had it (using curl for now as Windows usually has it)
                     subprocess.run(["curl", "-s", "-d", url_to_send, registry_url], capture_output=True, timeout=5)
                     # Dweet (Backup)
                     subprocess.run(["curl", "-s", dweet_url_base + url_to_send], capture_output=True, timeout=5)
@@ -197,36 +209,42 @@ def start_robust_heartbeat():
     threading.Thread(target=signal_heartbeat, daemon=True).start()
 
 def toggle_caffeinate(on=True):
-    """Inibe o Mac de entrar em repouso profundo enquanto o sistema roda."""
+    """Inibe o sistema de dormir."""
     global CAFFEINATE_PROCESS
-    try:
-        if on:
-            if not CAFFEINATE_PROCESS or CAFFEINATE_PROCESS.poll() is not None:
-                print("☕ Ativando Cafeína (impedindo standby)...")
-                # -i: inhibit system idle sleep
-                # -d: inhibit display sleep (removido para economizar monitor, mas manter CPU)
-                # -m: inhibit disk idle sleep
-                # -s: inhibit system sleep while on AC power
-                CAFFEINATE_PROCESS = subprocess.Popen(["caffeinate", "-ims"])
-        else:
-            if CAFFEINATE_PROCESS:
-                print("☕ Encerrando Cafeína...")
-                CAFFEINATE_PROCESS.terminate()
-                CAFFEINATE_PROCESS = None
-    except Exception as e:
-        print(f"⚠️ Erro ao controlar caffeinate: {e}")
+    if not IS_WINDOWS:
+        try:
+            if on:
+                if not CAFFEINATE_PROCESS or CAFFEINATE_PROCESS.poll() is not None:
+                    print("☕ Ativando Cafeína (impedindo standby)...")
+                    CAFFEINATE_PROCESS = subprocess.Popen(["caffeinate", "-ims"])
+            else:
+                if CAFFEINATE_PROCESS:
+                    print("☕ Encerrando Cafeína...")
+                    CAFFEINATE_PROCESS.terminate()
+                    CAFFEINATE_PROCESS = None
+        except Exception as e:
+            print(f"⚠️ Erro ao controlar caffeinate: {e}")
+    else:
+        # On Windows, we can use a simpler method or just ignore it implies 'PowerToys Awake' or similar
+        # For now we skip specific Windows implementation as python doesn't have built-in easy awake
+        pass
 
 def start_tunnel():
     log("🌍 Iniciando Cloudflare Tunnel...")
-    if not os.path.exists("./cloudflared"):
-        print("❌ ERRO: Binário 'cloudflared' não encontrado.")
+    
+    # Check for cloudflared.exe on Windows
+    binary = "cloudflared.exe" if IS_WINDOWS else "./cloudflared"
+    
+    if not os.path.exists(binary) and not os.path.exists("./" + binary):
+        # Look in path? simplified check
+        print(f"❌ ERRO: Binário '{binary}' não encontrado.")
         return
 
     # Limpa logs antigos para garantir que pegamos a URL nova
     if os.path.exists("cloudflared.log"):
         open("cloudflared.log", "w").close()
 
-    tunnel_cmd = ["./cloudflared", "tunnel", "--protocol", "http2", "--url", "http://127.0.0.1:5005", "--logfile", "cloudflared.log"]
+    tunnel_cmd = [binary if os.path.exists(binary) else "./"+binary, "tunnel", "--url", f"http://127.0.0.1:{PORT}", "--logfile", "cloudflared.log"]
     process = subprocess.Popen(tunnel_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
     
     print("⏳ Aguardando URL pública da Cloudflare...")
@@ -250,30 +268,111 @@ def start_tunnel():
     if url:
         global CURRENT_PUBLIC_URL
         CURRENT_PUBLIC_URL = url
-        print(f"\n✨ TÚNEL PRONTO: {url} ✨")
+        print(f"\n✨ TÚNEL PRONTO (Cloudflare): {url} ✨")
+        print("   ⚠️  Se der ERRO 1033 nesse link, aguarde abaixo o LINK FIXO ou PINGGY!\n")
         update_config_js(url)
         
-        # Monitora a saúde do túnel (se o processo continua vivo)
+        # Monitora a saúde do túnel
         while process.poll() is None:
-            # Check health via API local
-            try:
-                # Se a porta 5005 está viva mas o túnel está mudo, reiniciamos
-                # (Opcional: você pode adicionar uma checagem aqui se quiser ser agressivo)
-                pass
-            except: pass
             time.sleep(5)
     else:
-        print("❌ Falha ao encontrar URL no Cloudflare.")
+        print("❌ Falha ao encontrar URL no Cloudflare (Firewall pode estar bloqueando).")
         process.kill()
+
+def start_serveo_fallback():
+    """Tenta abrir um túnel reserva via Serveo se o Cloudflare demorar."""
+    print("🌍 [Reserva 1] Tentando Serveo (Link Fixo)...")
+    try:
+        # Tenta pegar o subdominio 'ponto-sre-carapina'
+        # Adicionando 'user@' para evitar conflito com usuario do Windows
+        cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "-o", "ServerAliveInterval=60", "-R", f"ponto-sre-carapina:80:localhost:{PORT}", "user@serveo.net"]
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+        
+        for line in process.stdout:
+            if "Forwarding HTTP traffic from" in line:
+                match = re.search(r'https://[a-zA-Z0-9.-]+', line)
+                if match:
+                    url = match.group(0)
+                    if "ponto-sre-carapina" in url:
+                        print(f"\n🔗 LINK FIXO (SERVEO): {url}  <-- USE ESSE!\n")
+                    else:
+                        print(f"✨ TÚNEL RESERVA (SERVEO): {url}")
+                    
+                    global CURRENT_PUBLIC_URL
+                    CURRENT_PUBLIC_URL = url
+                    update_config_js(url)
+                    break
+        process.wait()
+    except Exception as e:
+        print(f"⚠️ Falha no Serveo: {e}")
+
+def start_pinggy_fallback():
+    """Tenta abrir um túnel reserva via Pinggy (Porta 443 - Melhor para Firewall)."""
+    print("🌍 [Reserva 2] Tentando Pinggy (Porta 443 - Ignorar pedido de senha)...")
+    try:
+        # Pinggy ssh command: ssh -p 443 -R0:localhost:5005 a.pinggy.io
+        # Adicionando 'user@' para evitar que o Windows tente logar como dominio
+        # Adicionando BatchMode=yes para falhar se pedir senha
+        cmd = ["ssh", "-p", "443", "-o", "StrictHostKeyChecking=no", "-o", "ServerAliveInterval=60", "-R0:localhost:" + str(PORT), "user@a.pinggy.io"]
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+        
+        for line in process.stdout:
+            # Pinggy outputs: http://...pinggy.link
+            match = re.search(r'https://[a-zA-Z0-9.-]+\.pinggy\.link', line) or re.search(r'http://[a-zA-Z0-9.-]+\.pinggy\.link', line)
+            if match:
+                url = match.group(0).replace("http://", "https://") # Force https
+                print(f"✨ TÚNEL RESERVA (PINGGY): {url}")
+                global CURRENT_PUBLIC_URL
+                CURRENT_PUBLIC_URL = url
+                update_config_js(url)
+                break
+        process.wait()
+    except Exception as e:
+        print(f"⚠️ Falha no Pinggy: {e}")
+
+def start_localhost_run_fallback():
+    """Tenta abrir um túnel reserva via Localhost.run (Porta 22)."""
+    print("🌍 [Reserva 3] Tentando Localhost.run...")
+    try:
+        cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "-R", f"80:localhost:{PORT}", "nokey@localhost.run"]
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+        
+        for line in process.stdout:
+            match = re.search(r'https://[a-zA-Z0-9.-]+\.lhr\.life', line) or re.search(r'https://[a-zA-Z0-9.-]+\.localhost\.run', line)
+            if match:
+                url = match.group(0)
+                print(f"✨ TÚNEL RESERVA (LOCALHOST.RUN): {url}")
+                global CURRENT_PUBLIC_URL
+                CURRENT_PUBLIC_URL = url
+                update_config_js(url)
+                break
+        process.wait()
+    except Exception as e:
+        print(f"⚠️ Falha no Localhost.run: {e}")
 
 def kill_port(port):
     try:
-        cmd = f"lsof -ti:{port}"
-        pids = subprocess.check_output(cmd, shell=True).decode().strip().split('\n')
-        for pid in pids:
-            if pid:
-                print(f"🧹 Liberando porta {port} (PID {pid})...")
-                os.kill(int(pid), signal.SIGKILL)
+        if IS_WINDOWS:
+            # Windows way to kill port
+            cmd = f"netstat -ano | findstr :{port}"
+            try:
+                output = subprocess.check_output(cmd, shell=True).decode()
+                for line in output.splitlines():
+                    parts = line.split()
+                    if len(parts) > 4:
+                        pid = parts[-1] 
+                        if pid != "0": 
+                            # print(f"🧹 Liberando porta {port} (PID {pid})...")
+                            os.system(f"taskkill /F /PID {pid} >nul 2>&1")
+            except: pass
+        else:
+            # Unix way
+            cmd = f"lsof -ti:{port}"
+            pids = subprocess.check_output(cmd, shell=True).decode().strip().split('\n')
+            for pid in pids:
+                if pid:
+                    print(f"🧹 Liberando porta {port} (PID {pid})...")
+                    os.kill(int(pid), signal.SIGKILL)
     except: pass
 
 if __name__ == "__main__":
@@ -284,7 +383,10 @@ if __name__ == "__main__":
             os.kill(old_pid, 0)
             print(f"⚠️ O sistema já está rodando (PID {old_pid}).")
             sys.exit(0)
-        except: pass
+        except SystemExit:
+            raise
+        except: 
+            pass
     
     with open(LOCK_FILE, "w") as f:
         f.write(str(os.getpid()))
@@ -295,11 +397,15 @@ if __name__ == "__main__":
     # Iniciar backend
     threading.Thread(target=run_backend, daemon=True).start()
     
+    # [NOVO] Adiciona o IP local no script IMEDIATAMENTE antes dos túneis externos travarem no proxy
+    update_config_js("")
+    
     # Iniciar Heartbeat Persistente (uma única vez)
     start_robust_heartbeat()
     
-    # Iniciar túnel de reserva (Serveo)
+    # Iniciar túneis de reserva em threads paralelas
     threading.Thread(target=start_serveo_fallback, daemon=True).start()
+    threading.Thread(target=start_pinggy_fallback, daemon=True).start()
     
     # Iniciar monitoramento de saúde (Self-Healing)
     def monitor_health():
@@ -323,25 +429,24 @@ if __name__ == "__main__":
                             print(f"⚠️ Health Check retornou status {response.status}")
                             fail_count += 1
                 except Exception as e:
-                    print(f"⚠️ Falha no Health Check: {e}")
+                    # print(f"⚠️ Falha no Health Check: {e}")
                     fail_count += 1
                 
                 # Se falhar 3 vezes seguidas (1m30s sem acesso), mata tudo
                 if fail_count >= 3:
-                    print("💀 MÁXIMO DE FALHAS ATINGIDO. O SISTEMA SERÁ REINICIADO AGORA.")
-                    # Mata o processo atual. O keep_alive.sh vai reiniciar.
-                    os.kill(os.getpid(), signal.SIGKILL)
+                     # On Windows we can just exit
+                     print("💀 MÁXIMO DE FALHAS ATINGIDO. O SISTEMA SERÁ REINICIADO AGORA.")
+                     os._exit(1)
             else:
-                # Se não tem URL ainda, zera contador mas não reclama (startup)
                 fail_count = 0
-
+                
     threading.Thread(target=monitor_health, daemon=True).start()
 
     try:
         while True:
             start_tunnel()
-            print("⚠️ Túnel principal caiu. Reiniciando em 5s...")
-            time.sleep(5)
+            print("⚠️ Túnel principal caiu. Tentando reiniciar em 10s...")
+            time.sleep(10)
     except KeyboardInterrupt:
         print("\n🛑 Encerrando...")
         toggle_caffeinate(False)

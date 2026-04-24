@@ -1,0 +1,1770 @@
+<!DOCTYPE html>
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SRE Carapina - Registro de Ponto</title>
+<!-- jsPDF libs -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "error": "#ba1a1a",
+                        "tertiary-fixed-dim": "#ffb86a",
+                        "surface-container-high": "#e7e8e9",
+                        "surface": "#f8f9fa",
+                        "on-error-container": "#93000a",
+                        "primary-fixed-dim": "#98cbff",
+                        "on-secondary-fixed": "#38081f",
+                        "primary-container": "#2d73aa",
+                        "inverse-primary": "#98cbff",
+                        "on-primary-container": "#ebf3ff",
+                        "on-tertiary-container": "#fff0e4",
+                        "on-surface": "#191c1d",
+                        "on-primary-fixed": "#001d33",
+                        "on-primary": "#ffffff",
+                        "secondary-fixed": "#ffd9e3",
+                        "inverse-surface": "#2e3132",
+                        "surface-dim": "#d9dadb",
+                        "surface-tint": "#136299",
+                        "secondary-fixed-dim": "#ffb0cb",
+                        "surface-container-highest": "#e1e3e4",
+                        "outline": "#727782",
+                        "secondary-container": "#ffb0cb",
+                        "secondary": "#894b62",
+                        "on-tertiary-fixed": "#2c1700",
+                        "on-secondary": "#ffffff",
+                        "surface-container": "#edeeef",
+                        "on-tertiary-fixed-variant": "#683d00",
+                        "on-secondary-fixed-variant": "#6d344a",
+                        "on-error": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-background": "#191c1d",
+                        "on-surface-variant": "#424751",
+                        "surface-bright": "#f8f9fa",
+                        "background": "#f8f9fa",
+                        "tertiary-container": "#9f6000",
+                        "surface-variant": "#e1e3e4",
+                        "outline-variant": "#c2c6d2",
+                        "primary": "#005a8f",
+                        "tertiary": "#7d4b00",
+                        "inverse-on-surface": "#f0f1f2",
+                        "surface-container-low": "#f3f4f5",
+                        "on-primary-fixed-variant": "#004a77",
+                        "tertiary-fixed": "#ffdcbc",
+                        "on-secondary-container": "#7b3f56",
+                        "error-container": "#ffdad6",
+                        "primary-fixed": "#cfe5ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at 0% 0%, #cfe5ff 0%, transparent 40%),
+                        radial-gradient(circle at 100% 100%, #ffd9e3 0%, transparent 40%),
+                        #f8f9fa;
+            min-height: 100vh;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Modal simple transition */
+        #retroactiveModal { transition: opacity 0.3s; }
+        .hidden { display: none !important; }
+        
+        .btn-punch { cursor: pointer; }
+        .btn-punch:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>
+</head>
+<body class="text-on-surface min-h-screen selection:bg-primary-fixed">
+
+<!-- Top Navigation Shell -->
+<header class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-xl border-b border-outline-variant/10">
+<div class="flex justify-between items-center px-6 py-3 w-full max-w-[1440px] mx-auto relative">
+<div class="flex items-center gap-3">
+<div class="userInitials w-10 h-10 rounded-full overflow-hidden bg-surface-container-high flex items-center justify-center border border-outline-variant/20 font-bold text-primary">
+</div>
+<div class="hidden sm:block">
+<p class="userNameText text-sm font-bold tracking-tight text-on-surface">Manoel da Silva</p>
+<p class="userCargoText text-[10px] uppercase tracking-widest text-on-surface-variant">Analista de TI</p>
+</div>
+</div>
+<div class="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
+<img alt="Brasão do ES" class="h-10 md:h-12 w-auto drop-shadow-sm" src="https://cdn.es.gov.br/images/logo/governo/brasao/center/Brasao_Governo_500.png"/>
+</div>
+<div class="flex items-center gap-4">
+<span id="connStatus" class="px-3 py-1 rounded-full text-xs font-bold font-mono">Offline</span>
+<button onclick="logout()" class="flex items-center gap-2 text-sm font-bold text-error border border-error/30 hover:bg-error/10 px-4 py-2 rounded-full transition-colors">
+<span class="material-symbols-outlined text-[18px]">logout</span> Sair
+</button>
+</div>
+</div>
+</header>
+
+<!-- Navigation Drawer (Desktop) -->
+<aside class="fixed left-0 top-0 h-screen w-72 z-40 hidden xl:flex flex-col bg-[#f8f9fa]/80 backdrop-blur-md rounded-r-[3rem] shadow-2xl shadow-[#191c1d]/5 pt-24 pb-8 px-6">
+<nav class="flex-1 space-y-2">
+<a class="flex items-center gap-4 py-4 px-6 bg-[#3370B7] text-white rounded-full transition-all translate-x-1 duration-300" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-medium">Dashboard</span>
+</a>
+</nav>
+<div class="mt-auto pt-6 border-t border-outline-variant/15">
+<div class="flex items-center gap-3 px-4">
+<div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-primary font-bold text-xs">GTI</div>
+<div>
+<p class="text-xs font-bold text-on-surface">SRE Carapina / GTI</p>
+<p class="text-[10px] text-on-surface-variant">Electronic Time Clock</p>
+</div>
+</div>
+</div>
+</aside>
+
+<!-- Main Content Canvas -->
+<main class="pt-28 pb-24 xl:pb-12 px-4 md:px-8 xl:pl-80 max-w-[1440px] mx-auto">
+<!-- Hero Clock Section -->
+<section class="mb-8 md:mb-12 text-center">
+<div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary-fixed text-on-primary-fixed-variant text-xs font-bold uppercase tracking-widest mb-4">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+</span>
+            Tempo Real
+        </div>
+<h1 id="realTimeClock" class="text-6xl md:text-8xl font-black tracking-tighter text-on-surface mb-2">
+</h1>
+<p id="realTimeDate" class="text-lg md:text-xl text-on-surface-variant font-medium uppercase tracking-wide"></p>
+</section>
+
+<!-- Profile, Location & Action Grid Bento -->
+<div class="flex flex-col gap-6 mb-8 md:mb-12">
+<!-- User Summary & Location Card -->
+<div class="w-full bg-white p-6 md:p-8 rounded-xl shadow-xl shadow-on-surface/[0.03] flex flex-col xl:flex-row xl:items-start justify-between overflow-hidden relative group border border-outline-variant/10 gap-6">
+<div class="absolute top-0 right-0 w-32 h-32 bg-secondary-fixed opacity-20 rounded-bl-full transition-transform group-hover:scale-110"></div>
+<div class="relative z-10 flex flex-col md:flex-row md:items-center gap-6">
+<div class="w-16 h-16 rounded-2xl bg-primary-container flex items-center justify-center text-on-primary-container text-2xl font-bold shadow-sm shrink-0 userInitials">
+</div>
+<div>
+<p class="userNameText text-2xl font-bold text-on-surface leading-tight">Servidor</p>
+<p class="userCargoText text-on-surface-variant">Cargo</p>
+</div>
+</div>
+<div class="relative z-10 mt-2 xl:mt-0 max-w-sm w-full bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20">
+    <div class="flex items-center gap-2 mb-2">
+        <span class="material-symbols-outlined text-primary text-sm">my_location</span>
+        <span class="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Local GPS do Ponto</span>
+    </div>
+    <div id="locationStatus" class="text-xs font-medium text-on-surface px-2 py-1 bg-surface-container mb-2 rounded border-l-2 border-primary">Obtendo localização...</div>
+    <div class="flex gap-2 mb-2">
+        <input type="text" id="locNeighborhood" placeholder="Bairro" disabled class="w-1/2 text-xs p-2 rounded border border-outline-variant/30 bg-surface-container-lowest disabled:bg-surface-container-high transition-colors" />
+        <input type="text" id="locCity" placeholder="Cidade" disabled class="w-1/2 text-xs p-2 rounded border border-outline-variant/30 bg-surface-container-lowest disabled:bg-surface-container-high transition-colors" />
+    </div>
+    <button id="editLocBtn" class="text-xs font-bold text-primary hover:underline">Editar Local</button>
+</div>
+</div>
+
+<!-- Action Grid -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+<button onclick="registerPunch('Entrada')" class="btn-punch bg-gradient-to-br from-primary to-primary-container text-white p-6 md:p-8 rounded-xl flex flex-col items-center justify-center gap-4 shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:-translate-y-1 transition-all active:scale-95 group min-h-[140px] md:min-h-[180px]">
+<div class="w-14 h-14 md:w-16 md:h-16 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors">
+<span class="material-symbols-outlined !text-3xl md:!text-4xl" data-icon="login">login</span>
+</div>
+<span class="font-bold tracking-tight text-base md:text-lg">Entrada</span>
+</button>
+<button onclick="registerPunch('Saída Almoço')" class="btn-punch bg-white text-on-surface p-6 md:p-8 rounded-xl flex flex-col items-center justify-center gap-4 shadow-sm border border-outline-variant/10 hover:bg-secondary-container/20 transition-all hover:-translate-y-1 group min-h-[140px] md:min-h-[180px]">
+<div class="w-14 h-14 md:w-16 md:h-16 rounded-full bg-secondary-fixed/50 flex items-center justify-center text-secondary group-hover:bg-secondary-fixed transition-colors">
+<span class="material-symbols-outlined !text-3xl md:!text-4xl" data-icon="restaurant">restaurant</span>
+</div>
+<span class="font-bold tracking-tight text-base md:text-lg">Almoço</span>
+</button>
+<button onclick="registerPunch('Volta Almoço')" class="btn-punch bg-white text-on-surface p-6 md:p-8 rounded-xl flex flex-col items-center justify-center gap-4 shadow-sm border border-outline-variant/10 hover:bg-primary-fixed/20 transition-all hover:-translate-y-1 group min-h-[140px] md:min-h-[180px]">
+<div class="w-14 h-14 md:w-16 md:h-16 rounded-full bg-primary-fixed/50 flex items-center justify-center text-primary group-hover:bg-primary-fixed transition-colors">
+<span class="material-symbols-outlined !text-3xl md:!text-4xl" data-icon="replay">replay</span>
+</div>
+<span class="font-bold tracking-tight text-base md:text-lg">Volta</span>
+</button>
+<button onclick="registerPunch('Saída')" class="btn-punch bg-white text-on-surface p-6 md:p-8 rounded-xl flex flex-col items-center justify-center gap-4 shadow-sm border border-outline-variant/10 hover:bg-error-container/20 transition-all hover:-translate-y-1 group min-h-[140px] md:min-h-[180px]">
+<div class="w-14 h-14 md:w-16 md:h-16 rounded-full bg-error-container/50 flex items-center justify-center text-error group-hover:bg-error-container transition-colors">
+<span class="material-symbols-outlined !text-3xl md:!text-4xl" data-icon="logout">logout</span>
+</div>
+<span class="font-bold tracking-tight text-base md:text-lg">Saída</span>
+</button>
+</div>
+<button onclick="openRetroactiveModal()" class="w-full flex items-center justify-center gap-2 py-4 px-6 border border-outline-variant/30 text-on-surface-variant rounded-xl font-medium text-sm hover:bg-surface-container-low transition-all active:scale-[0.98] group">
+<span class="text-orange-500">⚠️</span>
+            Esqueci de bater o ponto / Corrigir o ponto
+        </button>
+</div>
+
+<!-- Recent Logs & Reports Table -->
+<section class="bg-white rounded-xl p-6 md:p-8 shadow-xl shadow-on-surface/[0.03] border border-outline-variant/10">
+<div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6">
+<h2 class="text-xl font-bold text-on-surface flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="schedule">schedule</span>
+                Meus Registros
+            </h2>
+<div class="flex flex-wrap items-center gap-2 bg-surface-container-lowest p-2 rounded-lg border border-outline-variant/20 shadow-sm">
+    <div class="flex flex-col">
+        <label class="text-[10px] font-bold text-on-surface-variant px-1 uppercase">Início</label>
+        <input type="date" id="startDate" class="text-xs p-1.5 rounded border border-outline-variant/30" />
+    </div>
+    <div class="flex flex-col">
+        <label class="text-[10px] font-bold text-on-surface-variant px-1 uppercase">Fim</label>
+        <input type="date" id="endDate" class="text-xs p-1.5 rounded border border-outline-variant/30" />
+    </div>
+    <div class="flex flex-wrap flex-1 gap-2 pt-4">
+        <button onclick="downloadEDocsReport()" class="px-3 py-1.5 bg-surface-container-high hover:bg-surface-container-highest transition-colors rounded text-xs font-bold border border-outline-variant/30">E-DOCS PDF</button>
+        <button onclick="downloadSiahresReport()" class="px-3 py-1.5 bg-surface-container-high hover:bg-surface-container-highest transition-colors rounded text-xs font-bold border border-outline-variant/30">SIAHRES PDF</button>
+        <button onclick="downloadMyReport()" class="px-3 py-1.5 bg-surface-container-high hover:bg-surface-container-highest transition-colors rounded text-xs font-bold border border-outline-variant/30">Excel</button>
+        <button id="syncBtn" onclick="syncNow()" class="px-3 py-1.5 bg-primary text-white hover:bg-primary-container hover:text-white transition-colors rounded text-xs font-bold ml-auto shadow flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">sync</span> Sync
+        </button>
+    </div>
+</div>
+</div>
+<div class="overflow-x-auto -mx-6 sm:mx-0">
+<table class="w-full text-left min-w-[600px] border-collapse">
+<thead>
+<tr class="text-on-surface-variant text-xs font-bold uppercase tracking-widest border-b border-outline-variant/20">
+<th class="pb-3 px-6 sm:px-4">Tipo</th>
+<th class="pb-3 px-6 sm:px-4">Data/Hora</th>
+<th class="pb-3 px-6 sm:px-4">Bairro</th>
+<th class="pb-3 px-6 sm:px-4">Cidade</th>
+</tr>
+</thead>
+<tbody id="historyTable" class="text-on-surface text-sm">
+<!-- JS Rendered -->
+</tbody>
+</table>
+</div>
+</section>
+</main>
+
+<!-- Bottom Navigation (Mobile Only) -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-2 bg-white/80 backdrop-blur-2xl xl:hidden z-50 rounded-t-xl shadow-[0_-8px_32px_rgba(25,28,29,0.06)] border-t border-outline-variant/10">
+<a class="flex flex-col items-center justify-center bg-gradient-to-br from-[#3370B7] to-[#2d73aa] text-white rounded-[2rem] py-2 px-6 scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="text-[10px] font-bold uppercase tracking-widest mt-1">Início</span>
+</a>
+</nav>
+
+<!-- Footer -->
+<footer class="xl:pl-80 py-4 px-6 text-center xl:text-left">
+    <div class="max-w-[1440px] mx-auto flex flex-col md:flex-row justify-between items-center gap-6 opacity-40 hover:opacity-100 transition-opacity">
+        <p class="text-xs font-bold tracking-[0.2em] text-on-surface-variant">SRE CARAPINA / GTI</p>
+    </div>
+</footer>
+
+<!-- Retroactive Punch Modal (Tailwind Rewrite) -->
+<div id="retroactiveModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+        <div class="bg-surface-container text-on-surface px-6 py-4 flex justify-between items-center border-b border-outline-variant/20">
+            <h5 class="font-bold text-lg">Esqueci de bater o ponto / Corrigir o ponto</h5>
+            <button onclick="document.getElementById('retroactiveModal').classList.add('hidden')" class="w-8 h-8 rounded-full hover:bg-surface-container-high transition-colors flex justify-center items-center">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <div class="p-6 overflow-y-auto">
+            <form id="retroactiveForm" onsubmit="submitRetroactivePunch(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">Data e Hora do Ponto</label>
+                    <input type="datetime-local" id="retroDatetime" required class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg h-12 px-3 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">Tipo do Ponto</label>
+                    <div class="relative">
+                        <select id="retroType" required class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg h-12 px-3 text-sm appearance-none focus:ring-2 focus:ring-primary focus:border-primary transition-all">
+                            <option value="Entrada">Entrada</option>
+                            <option value="Saída Almoço">Saída Almoço</option>
+                            <option value="Volta Almoço">Volta Almoço</option>
+                            <option value="Saída">Saída</option>
+                            <option value="3º Turno - Saída Extra">3º Turno - Saída Extra</option>
+                            <option value="3º Turno - Entrada Extra">3º Turno - Entrada Extra</option>
+                            <option value="Atestado (Dia Todo)">Atestado (Dia Todo)</option>
+                            <option value="Abono (Dia Todo)">Abono (Dia Todo)</option>
+                            <option value="Uso de Saldo/Compensação">Uso de Saldo/Compensação</option>
+                        </select>
+                        <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">Justificativa / Motivo</label>
+                    <textarea id="retroJustification" rows="3" required placeholder="Exemplo: Esqueci de bater, falha de rede..." class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all resize-none"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">Anexo <span class="text-outline">(Opcional)</span></label>
+                    <input type="file" id="retroDocument" accept="image/*,application/pdf" class="w-full text-sm text-on-surface-variant file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-fixed file:text-primary hover:file:bg-primary-fixed-dim transition-colors cursor-pointer">
+                </div>
+                <div class="pt-4 border-t border-outline-variant/20 flex justify-end gap-3">
+                    <button type="button" onclick="document.getElementById('retroactiveModal').classList.add('hidden')" class="px-5 py-2.5 rounded-full font-bold text-sm bg-surface-container-high hover:bg-surface-container-highest transition-colors">Cancelar</button>
+                    <button type="submit" id="btnRetroSubmit" class="px-5 py-2.5 rounded-full font-bold text-sm bg-primary text-white hover:shadow-lg hover:-translate-y-0.5 transition-all">Salvar Registro</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="config.js?v=7.2"></script>
+    <script>
+        let currentLocation = {
+            neighborhood: null,
+            city: null,
+            latitude: null,
+            longitude: null,
+            accuracy: null,
+            full_address: null
+        };
+        let locationReady = false;
+        let isLocating = false;
+        let todayPunches = new Set();
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('ponto_token');
+            if (!token) window.location.href = 'index.html';
+            
+            const userNameStr = localStorage.getItem('user_name') || 'Servidor';
+            document.querySelectorAll('.userNameText').forEach(e => e.innerText = userNameStr);
+            document.querySelectorAll('.userCargoText').forEach(e => e.innerText = localStorage.getItem('user_cargo') || 'Membro da Equipe');
+            const initialsMatches = userNameStr.match(/\b(\w)/g) || [];
+            const initials = ((initialsMatches.shift() || '') + (initialsMatches.pop() || '')).toUpperCase();
+            document.querySelectorAll('.userInitials').forEach(e => e.innerText = initials);
+            
+            // start clock
+            setInterval(() => {
+                const clockNow = new Date();
+                const hh = String(clockNow.getHours()).padStart(2, '0');
+                const mm = String(clockNow.getMinutes()).padStart(2, '0');
+                const ss = String(clockNow.getSeconds()).padStart(2, '0');
+                
+                const timeEl = document.getElementById('realTimeClock');
+                if (timeEl) {
+                    timeEl.innerHTML = `${hh}:${mm}<span class="text-2xl md:text-4xl text-on-surface-variant font-medium tracking-normal">:${ss}</span>`;
+                }
+                
+                const dOpts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                const dayEl = document.getElementById('realTimeDate');
+                if (dayEl) {
+                    dayEl.innerText = clockNow.toLocaleDateString('pt-BR', dOpts);
+                }
+            }, 1000);
+
+            initGeolocation();
+            loadHistory();
+            loadStatus();
+            checkEndOfMonth();
+            setInterval(loadStatus, 10000);
+            initGeolocation();
+        });
+
+        async function initGeolocation(ignoreIsLocating = false) {
+            if (isLocating && !ignoreIsLocating) return;
+            isLocating = true;
+
+            const statusDiv = document.getElementById('locationStatus');
+            statusDiv.innerText = "Obtendo localização GPS...";
+            statusDiv.className = "alert alert-warning";
+
+            if ("geolocation" in navigator) {
+                const geoOptionsHigh = {
+                    enableHighAccuracy: true,
+                    timeout: 5000,
+                    maximumAge: 0
+                };
+
+                const geoOptionsLow = {
+                    enableHighAccuracy: false,
+                    timeout: 15000,
+                    maximumAge: 0
+                };
+
+                const successCallback = async (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    currentLocation.latitude = lat;
+                    currentLocation.longitude = lon;
+                    currentLocation.accuracy = position.coords.accuracy;
+
+                    statusDiv.innerText = "Localização obtida. Processando endereço...";
+                    statusDiv.className = "alert alert-info";
+
+                    try {
+                        // Priority: Nominatim for better neighborhood accuracy in Brazil
+                        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, {
+                            headers: { 'User-Agent': 'PontoEletronicoApp/1.2' }
+                        });
+                        const data = await response.json();
+                        const addr = data.address || {};
+
+                        currentLocation.city = (addr.city || addr.town || addr.village || addr.municipality || "Vitória") + " - ES";
+                        // Neighborhoods in Nominatim can be in several fields
+                        currentLocation.neighborhood = addr.suburb || addr.neighbourhood || addr.neighbourhood_level2 || addr.hamlet || addr.residential || addr.district || "Desconhecido";
+                        currentLocation.full_address = data.display_name;
+
+                        statusDiv.innerText = `Localização: ${currentLocation.neighborhood}, ${currentLocation.city}`;
+                        statusDiv.className = "alert alert-success";
+
+                        document.getElementById('locNeighborhood').value = currentLocation.neighborhood;
+                        document.getElementById('locCity').value = currentLocation.city;
+                        locationReady = true;
+
+                        // Sticky Location: Update if precision is good or manual was set before
+                        if (currentLocation.accuracy && currentLocation.accuracy < 100) {
+                            saveStickyLocation(currentLocation.neighborhood, currentLocation.city);
+                        }
+                    } catch (error) {
+                        // ... existing fallback ...
+                        try {
+                            const alt = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=pt`);
+                            const js = await alt.json();
+                            currentLocation.city = (js.city || js.locality || "Vitória") + " - ES";
+                            currentLocation.neighborhood = js.locality || "Desconhecido";
+
+                            statusDiv.innerText = `Localização: ${currentLocation.neighborhood}, ${currentLocation.city}`;
+                            statusDiv.className = "alert alert-success";
+                            document.getElementById('locNeighborhood').value = currentLocation.neighborhood;
+                            document.getElementById('locCity').value = currentLocation.city;
+                            locationReady = true;
+                        } catch (e2) {
+                            statusDiv.innerText = "Localização identificada por coordenadas.";
+                            statusDiv.className = "alert alert-info";
+                            locationReady = true;
+                        }
+                    } finally {
+                        isLocating = false;
+                    }
+                };
+
+                const errorCallback = (err) => {
+                    console.warn(`Geolocation High Accuracy Failed (${err.code}): ${err.message}. Retrying with Low Accuracy...`);
+
+                    // Fallback to Low Accuracy
+                    navigator.geolocation.getCurrentPosition(successCallback, async (err2) => {
+                        console.error("Geolocation Low Accuracy Also Failed:", err2);
+
+                        // FINAL AUTOMATIC FALLBACK: Smart IP Geolocation
+                        // User requires automatic neighborhood detection.
+                        // We use ipwho.is which often provides better lat/lon for sorting into neighborhoods than generic APIs.
+                        statusDiv.innerText = "Localizando via Rede (Alta Precisão)...";
+
+                        try {
+
+
+                            // FINAL AUTOMATIC FALLBACK: Smart Multi-IP Geolocation
+                            statusDiv.innerText = "Localizando via Rede (Cross-Check)...";
+
+                            const providers = [
+                                'https://ipapi.co/json/',
+                                'https://ipwho.is/',
+                                'https://api.ipify.org?format=json' // Just for IP
+                            ];
+
+                            let bestLat, bestLon, bestCity, bestRegion;
+
+                            // Try multiple providers in parallel and pick the most detailed one
+                            const results = await Promise.allSettled([
+                                fetch('https://ipapi.co/json/').then(r => r.json()),
+                                fetch('https://ipwho.is/').then(r => r.json()),
+                                fetch('https://freeipapi.com/api/json').then(r => r.json())
+                            ]);
+
+                            results.forEach(res => {
+                                if (res.status === 'fulfilled') {
+                                    const d = res.value;
+                                    // if it's from ipapi.co
+                                    if (d.latitude && d.longitude && d.city) {
+                                        if (!bestLat || (d.city && d.city.toLowerCase().includes('vitoria'))) {
+                                            bestLat = d.latitude;
+                                            bestLon = d.longitude;
+                                            bestCity = d.city;
+                                        }
+                                    }
+                                    // if it's from ipwho.is
+                                    if (d.success && d.latitude) {
+                                        if (!bestLat || (d.city && d.city.toLowerCase().includes('vitoria'))) {
+                                            bestLat = d.latitude;
+                                            bestLon = d.longitude;
+                                            bestCity = bestCity || d.city;
+                                        }
+                                    }
+                                    // if it's from freeipapi.com
+                                    if (d.latitude && d.longitude && d.cityName) {
+                                        if (!bestLat || (d.cityName && d.cityName.toLowerCase().includes('vitoria'))) {
+                                            bestLat = d.latitude;
+                                            bestLon = d.longitude;
+                                            bestCity = bestCity || d.cityName;
+                                        }
+                                    }
+                                }
+                            });
+
+                            if (!bestLat) throw new Error("All IP providers failed");
+
+                            const lat = bestLat;
+                            const lon = bestLon;
+
+                            // OVERRIDE: Correction for known ISP mislocation (Santa Clara -> Jardim da Penha)
+                            if (bestCity && bestCity.includes("Vitória")) {
+                                // Common mismatch for Vivo/Claro fiber nodes in this region
+                                if (!bestRegion || bestRegion.includes("Santa Clara") || bestLat.toString().startsWith("-20.2") || bestLat.toString().startsWith("-20.3")) {
+                                    // Only apply if user hasn't explicitly set another sticky location
+                                    const currentSticky = getStickyLocation();
+                                    if (!currentSticky || currentSticky.neighborhood === "Santa Clara") {
+                                        console.log("Auto-correcting ISP location: Santa Clara -> Jardim da Penha");
+                                        // Mock the correct coords for Jardim da Penha to ensure Nominatim confirms it or just force it
+                                        // Coords: -20.286, -40.292 (approx)
+                                        // But better just force the name if we are sure.
+                                        // Let's force the name AFTER Nominatim or BEFORE?
+                                        // Let's force it in the Display Logic to be safe.
+                                    }
+                                }
+                            }
+
+                            // Now feed these coordinates into Nominatim (OSM) to get the "Official" Neighborhood name
+                            // This matches the behavior of valid GPS, ensuring consistency (e.g. "Jardim da Penha")
+                            statusDiv.innerText = "Refinando bairro...";
+
+                            const osmResp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, {
+                                headers: { 'User-Agent': 'PontoEletronicoApp/1.2' }
+                            });
+                            const osmData = await osmResp.json();
+                            const addr = osmData.address || {};
+
+                            currentLocation.city = (addr.city || addr.town || addr.village || addr.municipality || bestCity || "Vitória") + " - ES";
+                            currentLocation.neighborhood = addr.suburb || addr.neighbourhood || addr.neighbourhood_level2 || addr.hamlet || addr.residential || addr.district || bestCity || "Desconhecido";
+
+                            // AUTO-CORRECT: Santa Clara -> Jardim da Penha
+                            if (currentLocation.city.includes("Vitória") && (currentLocation.neighborhood.includes("Santa Clara") || currentLocation.neighborhood === "Vitória")) {
+                                currentLocation.neighborhood = "Jardim da Penha";
+                                // Save this correction immediately
+                                saveStickyLocation(currentLocation.neighborhood, currentLocation.city);
+                            }
+
+                            // OVERRIDE: Local Network Specific Correction (Praia do Canto)
+                            // User works at Praia do Canto (SRE location there)
+                            if (window.location.hostname === '10.131.248.219') {
+                                console.log("Local IP detected: Forcing Praia do Canto location.");
+                                currentLocation.neighborhood = "Praia do Canto";
+                                currentLocation.city = "Vitória - ES";
+                                currentLocation.full_address = "Praia do Canto, Vitória - ES (Rede Local)";
+                                currentLocation.accuracy = 50;
+
+                                statusDiv.innerText = `Localização (Rede Local): ${currentLocation.neighborhood}, ${currentLocation.city}`;
+                                statusDiv.className = "alert alert-success";
+                                document.getElementById('locNeighborhood').value = currentLocation.neighborhood;
+                                document.getElementById('locCity').value = currentLocation.city;
+                                locationReady = true;
+                                isLocating = false;
+                                return;
+                            }
+
+                            currentLocation.latitude = lat;
+                            currentLocation.longitude = lon;
+                            currentLocation.accuracy = 2500; // Network accuracy
+                            currentLocation.full_address = osmData.display_name || bestCity;
+
+                            // Apply Sticky Location if it exists and matches city
+                            const sticky = getStickyLocation();
+                            if (sticky && (currentLocation.city.includes(sticky.city) || sticky.city.includes(currentLocation.city))) {
+                                console.log("Applying Sticky Location for better desktop accuracy");
+                                currentLocation.neighborhood = sticky.neighborhood;
+                                currentLocation.city = sticky.city;
+                                statusDiv.innerText = `Localização (Ajustada): ${currentLocation.neighborhood}, ${currentLocation.city}`;
+                            } else {
+                                statusDiv.innerText = `Localização (Rede): ${currentLocation.neighborhood}, ${currentLocation.city}`;
+                            }
+
+                            statusDiv.className = "alert alert-success";
+                            document.getElementById('locNeighborhood').value = currentLocation.neighborhood;
+                            document.getElementById('locCity').value = currentLocation.city;
+                            locationReady = true;
+                            isLocating = false;
+
+                        } catch (e3) {
+                            console.error("IP Geoloc failed", e3);
+                            let reason = "Falha Geral";
+                            let hint = "Não foi possível determinar sua localização automaticamente.";
+
+                            switch (err2.code) {
+                                case 1: reason = "Permissão Negada"; hint = "Libere o acesso à localização no navegador."; break;
+                                default: reason = "Sinal de Localização Indisponível"; break;
+                            }
+
+                            statusDiv.innerHTML = `
+                                 <div>
+                                     <strong>${reason}</strong><br>
+                                     <small>${hint}<br>Verifique sua conexão Wi-Fi.</small>
+                                 </div>
+                                 <button class="btn btn-sm btn-light ms-2" onclick="initGeolocation()">Tentar Novamente</button>
+                             `;
+                            statusDiv.className = "alert alert-danger d-flex align-items-center justify-content-between";
+                            isLocating = false;
+                        }
+                    }, geoOptionsLow);
+                };
+
+                // First attempt: High Accuracy
+                navigator.geolocation.getCurrentPosition(successCallback, errorCallback, geoOptionsHigh);
+            } else {
+                alert("Geolocalização não suportada neste navegador.");
+            }
+        }
+        document.getElementById('editLocBtn').addEventListener('click', async () => {
+            const n = document.getElementById('locNeighborhood');
+            const c = document.getElementById('locCity');
+            const editing = n.disabled;
+
+            if (editing) {
+                // Prompt for password (DYNAMICALLY FETCHED)
+                let correctPass = "admin123"; // Fallback
+
+                // Allow password-less edit on trusted Local IP
+                const isLocalIP = window.location.hostname === '10.131.248.219';
+
+                if (!isLocalIP) {
+                    try {
+                        statusDiv = document.getElementById('locationStatus');
+                        const originalStatus = statusDiv.innerText;
+                        statusDiv.innerText = "Verificando autorização...";
+
+                        if (window.API_READY) await window.API_READY;
+                        const res = await apiFetch('/api/config/location-password');
+                        const data = await res.json();
+                        if (data && data.password) correctPass = data.password;
+
+                        statusDiv.innerText = originalStatus;
+                    } catch (e) {
+                        console.warn("Could not fetch remote password, using local fallback");
+                    }
+
+                    const pass = window.prompt("Digite a senha de administrador para editar a localização:");
+                    if (pass !== correctPass) {
+                        alert("Senha incorreta. A edição não foi permitida.");
+                        return;
+                    }
+                } else {
+                    console.log("Local IP detected: Skipping password for location edit.");
+                }
+
+                n.disabled = false;
+                c.disabled = false;
+                document.getElementById('editLocBtn').innerText = 'Salvar';
+                document.getElementById('editLocBtn').className = 'btn btn-primary';
+            } else {
+                // Saving the manual changes
+                n.disabled = true;
+                c.disabled = true;
+                document.getElementById('editLocBtn').innerText = 'Editar';
+                document.getElementById('editLocBtn').className = 'btn btn-outline-secondary';
+
+                currentLocation.neighborhood = n.value || currentLocation.neighborhood;
+                currentLocation.city = c.value || currentLocation.city;
+                document.getElementById('locationStatus').innerText = `Localização: ${currentLocation.neighborhood}, ${currentLocation.city}${currentLocation.accuracy ? ` (±${Math.round(currentLocation.accuracy)}m)` : ''}`;
+
+                // Save Sticky Location for future visits on this desktop
+                saveStickyLocation(currentLocation.neighborhood, currentLocation.city);
+            }
+        });
+
+        // Sticky Location Helpers
+        function saveStickyLocation(neighborhood, city) {
+            localStorage.setItem('sticky_location', JSON.stringify({ neighborhood, city, ts: Date.now() }));
+        }
+        function getStickyLocation() {
+            try {
+                const s = localStorage.getItem('sticky_location');
+                if (!s) return null;
+                const d = JSON.parse(s);
+                // Keep for 30 days
+                if (Date.now() - d.ts > 30 * 24 * 60 * 60 * 1000) return null;
+                return d;
+            } catch (e) { return null; }
+        }
+
+        let isProcessingPunch = false;
+
+        async function registerPunch(type) {
+            if (!locationReady) {
+                alert("Aguarde a localização ou verifique as permissões.");
+                return;
+            }
+
+            // Prevenção de Duplicidade Diária
+            if (todayPunches.has(type)) {
+                alert(`Você já registrou a ${type} de hoje!`);
+                return;
+            }
+
+            // Validação de Sequência
+            if (type === 'Saída Almoço') {
+                if (!todayPunches.has('Entrada')) {
+                    alert("Você não bateu a entrada! Registre a entrada primeiro.");
+                    return;
+                }
+            } else if (type === 'Volta Almoço') {
+                if (!todayPunches.has('Saída Almoço')) {
+                    alert("Você não bateu a saída para o almoço! Registre o almoço primeiro.");
+                    return;
+                }
+            } else if (type === 'Saída') {
+                if (!todayPunches.has('Volta Almoço')) {
+                    alert("Você não bateu a volta do almoço! Registre a volta primeiro.");
+                    return;
+                }
+            }
+            // Fim da Validação
+
+            if (isProcessingPunch) return;
+            isProcessingPunch = true;
+
+            const transaction_id = 'txn_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+            // Disable buttons
+            const buttons = document.querySelectorAll('.btn-punch');
+            buttons.forEach(b => b.disabled = true);
+            const originalText = {};
+            buttons.forEach((b, i) => {
+                originalText[i] = b.innerHTML;
+                const btnLabel = b.innerText.toLowerCase().trim();
+                // Match "Almoço" in "Saída Almoço", "Volta" in "Volta Almoço", etc.
+                if (type.toLowerCase().includes(btnLabel.split(' ').pop())) {
+                    b.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processando...';
+                }
+            });
+
+            const token = localStorage.getItem('ponto_token');
+            const punchData = {
+                type,
+                neighborhood: document.getElementById('locNeighborhood').value || currentLocation.neighborhood,
+                city: document.getElementById('locCity').value || currentLocation.city,
+                latitude: currentLocation.latitude,
+                longitude: currentLocation.longitude,
+                accuracy: currentLocation.accuracy,
+                full_address: currentLocation.full_address,
+                transaction_id: transaction_id
+            };
+
+            try {
+                if (window.API_READY) await window.API_READY;
+                // Add short timeout to avoid stuck UI if network hangs
+                const response = await apiFetch(`/api/punch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(punchData)
+                });
+                if (response.ok) {
+                    alert("Ponto registrado com sucesso!");
+                    loadHistory();
+                    initGeolocation(true);
+                } else if (response.status === 409) {
+                    // v4.8: Duplicate detected on server, don't show error, just refresh view
+                    console.warn("Ponto já existia no servidor (transação duplicada).");
+                    loadHistory();
+                    initGeolocation(true);
+                } else {
+                    const errJs = await response.json().catch(() => ({}));
+                    // If it's a server error (500), treat as offline to save as PENDING
+                    if (response.status >= 500) {
+                        throw new Error("Server Error: " + (errJs.message || response.statusText));
+                    }
+                    alert("Erro ao registrar ponto: " + (errJs.message || response.statusText));
+                }
+            } catch (error) {
+                console.log("Network fail or Server 500, saving offline...");
+                const r = offline.punchAdd(
+                    type,
+                    punchData.neighborhood,
+                    punchData.city,
+                    {
+                        latitude: punchData.latitude,
+                        longitude: punchData.longitude,
+                        accuracy: punchData.accuracy,
+                        full_address: punchData.full_address,
+                        transaction_id: punchData.transaction_id,
+                        matricula: getMatricula()
+                    }
+                );
+                if (r && r.ok) {
+                    alert("Ponto registrado offline. Será sincronizado quando online.");
+                    loadHistory();
+                    initGeolocation(true);
+                } else {
+                    alert("Erro de conexão ao tentar registrar offline.");
+                }
+            } finally {
+                isProcessingPunch = false;
+                buttons.forEach((b, i) => {
+                    b.disabled = false;
+                    b.innerHTML = originalText[i];
+                });
+            }
+        }
+
+        // --- Retroactive Logic ---
+        function openRetroactiveModal() {
+            document.getElementById('retroactiveModal').classList.remove('hidden');
+            document.getElementById('retroactiveForm').reset();
+            // Default to today at 08:00
+            const now = new Date();
+            const dStr = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,'0') + "-" + String(now.getDate()).padStart(2,'0') + "T08:00";
+            document.getElementById('retroDatetime').value = dStr;
+            
+        }
+
+        async function submitRetroactivePunch(event) {
+            event.preventDefault();
+            const btn = document.getElementById('btnRetroSubmit');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Enviando...';
+
+            const token = localStorage.getItem('ponto_token');
+            const dt = document.getElementById('retroDatetime').value;
+            const type = document.getElementById('retroType').value;
+            const justification = document.getElementById('retroJustification').value;
+            const fileInput = document.getElementById('retroDocument');
+
+            const formData = new FormData();
+            formData.append('datetime', dt);
+            formData.append('type', type);
+            formData.append('justification', justification);
+            
+            if (fileInput.files.length > 0) {
+                formData.append('document', fileInput.files[0]);
+            }
+
+            try {
+                if (window.API_READY) await window.API_READY;
+                const response = await fetch((window.API_BASE_URL || '') + `/api/punch/retroactive`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }, // Do not set Content-Type; FormData sets it with boundary
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    alert('Ponto retroativo salvo com sucesso!');
+                    document.getElementById('retroactiveModal').classList.add('hidden');
+                    loadHistory();
+                } else {
+                    const errJs = await response.json().catch(() => ({}));
+                    alert("Erro ao registrar ponto retroativo: " + (errJs.message || response.statusText));
+                }
+            } catch (error) {
+                alert("Erro de conexão ao tentar salvar.");
+                console.error(error);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Salvar Registro';
+            }
+        }
+        // -------------------------
+
+        // v4.7: Robust matricula extraction
+        function getMatricula() {
+            let m = localStorage.getItem('user_matricula');
+            if (!m) {
+                const token = localStorage.getItem('ponto_token');
+                if (token && token.includes('.')) {
+                    try {
+                        const payload = JSON.parse(atob(token.split('.')[1]));
+                        m = payload.matricula;
+                        if (m) localStorage.setItem('matricula', m);
+                    } catch (e) { }
+                }
+            }
+            return m;
+        }
+
+        async function loadHistory(bypassCache = false) {
+            const token = localStorage.getItem('ponto_token');
+            const userMat = getMatricula();
+            const allRecords = [];
+            const cacheKey = 'cachedServerHistory_' + (userMat || 'anon');
+
+            let apiWorked = false;
+            try {
+                if (window.API_READY) await window.API_READY;
+                const response = await apiFetch(`/api/history`, { headers: { 'Authorization': `Bearer ${token}` } });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    let serverRecords = Array.isArray(data) ? data : (data.records || []);
+
+                    if (data.clear_cache) {
+                        console.log("Admin requested cache clear for this user.");
+                        localStorage.removeItem(cacheKey);
+                        offline.clear(userMat); // We need to add this clear method to offline object
+                        serverRecords = data.records || [];
+                    }
+
+                    if (Array.isArray(serverRecords)) {
+                        const oldCacheRaw = localStorage.getItem(cacheKey);
+                        let merged = serverRecords;
+                        if (oldCacheRaw) {
+                            try {
+                                const oldCache = JSON.parse(oldCacheRaw);
+                                const seenIds = new Set(serverRecords.map(r => r.transaction_id || (r.type + r.timestamp)));
+                                oldCache.forEach(oldR => {
+                                    const key = oldR.transaction_id || (oldR.type + oldR.timestamp);
+                                    if (!seenIds.has(key)) merged.push(oldR);
+                                });
+                            } catch (e) { }
+                        }
+                        merged.sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
+                        merged = merged.slice(0, 200);
+                        localStorage.setItem(cacheKey, JSON.stringify(merged));
+                        merged.forEach(r => allRecords.push({ ...r, pending: !!r.pending }));
+                        apiWorked = true;
+                    }
+                } else if (response.status >= 500) {
+                    throw new Error("Server History Error");
+                }
+            } catch (error) {
+                console.warn("API history failed, falling back to cache if allowed...", error);
+            }
+
+            if (!apiWorked && !bypassCache) {
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) {
+                    try {
+                        const cachedRecords = JSON.parse(cached);
+                        cachedRecords.forEach(r => allRecords.push({ ...r, pending: !!r.pending }));
+                    } catch (e) { }
+                }
+            }
+
+            // Always merge with local offline queue for the current user
+            try {
+                const localPunches = offline.history(userMat);
+                localPunches.forEach(lp => {
+                    // Robust deduplication: Ignore seconds/millis differences if needed, 
+                    // but for now, exact match or match within 1 second.
+                    const isDuplicate = allRecords.some(r => {
+                        if (r.type !== lp.type) return false;
+                        // timestamps might have .microseconds on server
+                        const t1 = r.timestamp.split('.')[0];
+                        const t2 = lp.timestamp.split('.')[0];
+                        return t1 === t2;
+                    });
+                    if (!isDuplicate) {
+                        allRecords.push(lp);
+                    }
+                });
+            } catch (e) {
+                console.error("Local history error", e);
+            }
+
+            // Render joined and deduplicated history
+            const tbody = document.getElementById('historyTable');
+            tbody.innerHTML = '';
+
+            // v6.8: Filter by current month only to "reset" users' view every month
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const currentMonthStr = `${year}-${month}`;
+
+            const monthlyRecords = allRecords.filter(r => (r.timestamp || "").startsWith(currentMonthStr));
+
+            // Atualiza o estado dos pontos de hoje para validação de sequência
+            const day = String(now.getDate()).padStart(2, '0');
+            const todayStr = `${year}-${month}-${day}`;
+            todayPunches.clear();
+            allRecords.forEach(r => {
+                if ((r.timestamp || "").startsWith(todayStr)) {
+                    todayPunches.add(r.type);
+                }
+            });
+
+            // Sort by timestamp desc to keep newest on top
+            monthlyRecords.sort((a, b) => {
+                const dateA = (a.timestamp || "").split('.')[0];
+                const dateB = (b.timestamp || "").split('.')[0];
+                return dateB.localeCompare(dateA);
+            });
+
+            monthlyRecords.forEach(r => {
+                let suffix = "";
+                if (r.pending) suffix += `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-warning-container text-on-warning-container ml-2 bg-yellow-100 text-yellow-800">pendente</span>`;
+                if (r.is_retroactive) {
+                    if (r.is_reviewed) {
+                        suffix += `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-variant text-on-surface-variant ml-2 bg-gray-200 text-gray-800" title="${r.justification}">Ajuste Manual</span>`;
+                    } else {
+                        suffix += `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-warning-container text-on-warning-container ml-2 bg-yellow-100 text-yellow-800" title="Aguardando aprovação do administrador">Aguardando Aprovação</span>`;
+                    }
+                }
+                if (r.document_path) {
+                    // Safe logic to make sure the endpoint works or at least it opens a local file link
+                    let cleanPath = r.document_path;
+                    if (cleanPath.startsWith('static/')) cleanPath = cleanPath.substring(7); // if the backend saved it as static/uploads/..., serve from /static/
+                    suffix += ` <a href="/static/${cleanPath}" target="_blank" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-container-high text-on-surface ml-2 underline bg-gray-100 text-gray-700" title="Ver Anexo">📎 Anexo</a>`;
+                }
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${r.type}${suffix}</td><td>${r.timestamp}</td><td>${r.neighborhood || '-'}</td><td>${r.city || '-'}</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        let isOnline = false;
+        let firstLoad = true;
+
+        async function loadStatus() {
+            try {
+                if (window.API_READY) await window.API_READY;
+                // Timeout curto para status check (3s) para não travar UI
+                const res = await apiFetch(`/api/online?t=${Date.now()}`, { method: 'GET' });
+
+                if (res && res.ok) {
+                    const js = await res.json();
+                    const badge = document.getElementById('connStatus');
+
+                    // Consideramos online se a API respondeu, mesmo que DB esteja lento (db_online pode ser false em startups)
+                    // Mas idealmente queremos ambos. Se DB off, mostramos Aviso.
+                    const currentlyOnline = js.online;
+                    const dbOnline = js.db_online;
+
+                    if (currentlyOnline) {
+                        if (dbOnline) {
+                            badge.className = 'badge bg-success me-3';
+                            badge.innerText = 'Online';
+                        } else {
+                            badge.className = 'badge bg-danger me-3';
+                            badge.innerText = 'Offline';
+                        }
+
+                        // Auto-sync transition: Offline -> Online OR First Load
+                        if (!isOnline) {
+                            console.log("Connection verified/restored. Auto-syncing...");
+                            syncNow(true); // Silent mode
+                        }
+                        isOnline = true;
+                    } else {
+                        badge.className = 'badge bg-danger me-3';
+                        badge.innerText = 'Offline';
+                        isOnline = false;
+                    }
+                } else {
+                    throw new Error("API Error " + res.status);
+                }
+
+                document.getElementById('syncBtn').disabled = false;
+
+                // Update pending count if offline
+                if (!isOnline) checkPendingCount();
+
+                firstLoad = false;
+            } catch (e) {
+                console.warn("Status check failed:", e);
+                const badge = document.getElementById('connStatus');
+                badge.className = 'badge bg-danger me-3';
+                badge.innerText = 'Offline';
+                isOnline = false;
+                document.getElementById('syncBtn').disabled = false;
+            }
+        }
+
+        async function checkPendingCount() {
+            // Optional: update UI with number of pending items
+            // This would require exposing existing offline queue length
+            // For now, we rely on the table rendering "pendente" badges
+        }
+
+        function initApiUi() {
+            // Removido conforme solicitado
+        }
+
+        async function syncNow(isSilent = false) {
+            const btn = document.getElementById('syncBtn');
+            const originalBtnHtml = btn ? btn.innerHTML : '';
+            if (btn && !isSilent) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sincronizando...';
+            }
+
+            const token = localStorage.getItem('ponto_token');
+            let msg = '';
+            let serverSuccess = false;
+            let totalMigrated = 0;
+            let errors = [];
+
+            // 1. Server-Side Sync (SQL <-> SQLite)
+            try {
+                if (window.API_READY) await window.API_READY;
+                const res = await apiFetch(`/api/sync`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+
+                let js = {};
+                try {
+                    js = await res.json();
+                } catch (jsonErr) {
+                    js = { message: "Resposta do servidor inválida (não-JSON)" };
+                }
+
+                if (res.ok) {
+                    serverSuccess = true;
+                    totalMigrated += (js.migrated || 0);
+                    if (!isSilent) msg += (js.message || `Sincronização servidor: ${js.migrated || 0} registros.`) + '\n';
+
+                    // v6.6: Also report partial errors from server sync
+                    if (js.errors && Array.isArray(js.errors) && js.errors.length > 0) {
+                        js.errors.forEach(e => errors.push("Servidor: " + e));
+                    }
+                } else if (!isSilent) {
+                    errors.push('Erro servidor (' + res.status + '): ' + (js.message || res.statusText));
+                    if (js.errors && Array.isArray(js.errors)) {
+                        js.errors.forEach(e => errors.push(e));
+                    }
+                }
+            } catch (e) {
+                if (!isSilent) errors.push('Servidor indisponível para sincronização.');
+            }
+
+            // 2. Client-Side Sync (Browser -> Backend)
+            try {
+                if (window.offline && window.offline.sync) {
+                    const r = await offline.sync(token);
+                    totalMigrated += r.migrated;
+                    if (!isSilent && r.migrated > 0) {
+                        msg += `Enviados do navegador: ${r.migrated} registros.\n`;
+                    }
+                }
+            } catch (e) {
+                if (!isSilent) errors.push('Erro ao sincronizar dados do navegador.');
+            }
+
+            if (btn && !isSilent) {
+                btn.disabled = false;
+                btn.innerHTML = originalBtnHtml;
+            }
+
+            if (isSilent) {
+                if (totalMigrated > 0) {
+                    alert(`Sincronização automática concluída: ${totalMigrated} registros enviados.`);
+                }
+            } else {
+                let finalMsg = msg || '';
+                if (errors.length > 0) {
+                    finalMsg += '\nProblemas detectados:\n' + errors.join('\n');
+                }
+                if (!finalMsg) finalMsg = 'Nenhum dado pendente de sincronização.';
+                alert(finalMsg);
+            }
+            loadHistory(true);
+            loadStatus();
+        }
+
+
+        async function downloadEDocsReport() {
+            if (!window.jspdf) { alert("Biblioteca PDF carregando..."); return; }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'portrait', format: 'a4' });
+
+            const logo = new Image();
+            logo.src = '/static/brasao.png'; 
+            try {
+                await new Promise((resolve) => {
+                    if (logo.complete) return resolve();
+                    logo.onload = resolve;
+                    logo.onerror = resolve;
+                });
+                doc.addImage(logo, 'PNG', 10, 5, 18, 22);
+            } catch (e) {
+                console.warn("Logo loading failed", e);
+            }
+
+            const userName = localStorage.getItem('user_name') || "Servidor";
+            const matricula = localStorage.getItem('matricula') || getMatricula() || "";
+            const s = document.getElementById('startDate').value;
+            let reportDate = new Date();
+            if (s) reportDate = new Date(s + "T12:00:00");
+
+            const monthStr = String(reportDate.getMonth() + 1).padStart(2, '0');
+            const yearStr = reportDate.getFullYear();
+
+            // Header Texts
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.text("ESTADO DO ESPIRITO SANTO", 35, 12);
+            doc.text("ESPIRITO SANTO SECRETARIA DE ESTADO DA EDUCACAO - SEDU", 35, 17);
+            
+            // Container for Frequência
+            doc.setLineWidth(0.2);
+            doc.setDrawColor(150, 150, 150); 
+            doc.setFontSize(11);
+            doc.setFont("helvetica", "bold");
+            doc.text(`FREQUÊNCIA - ${monthStr}/${yearStr}`, 105, 30, { align: "center" });
+
+            doc.line(10, 33, 200, 33);
+            doc.setFontSize(10);
+            doc.text("DADOS PESSOAIS", 10, 37);
+            doc.line(10, 39, 200, 39);
+            
+            doc.setFont("helvetica", "bold");
+            doc.text(`Nome:`, 10, 44);
+            doc.setFont("helvetica", "normal");
+            doc.text(userName.toUpperCase(), 23, 44);
+            doc.setFont("helvetica", "bold");
+            doc.text(`Nº Funcional:`, 150, 44);
+            doc.setFont("helvetica", "normal");
+            doc.text(matricula, 175, 44);
+            
+            doc.line(10, 46, 200, 46);
+            
+            doc.setFont("helvetica", "bold");
+            doc.text(`Órgão/Setor:`, 10, 51);
+            doc.setFont("helvetica", "normal");
+            doc.text(`SEDU - SRECARAP`, 35, 51);
+            
+            doc.line(10, 53, 200, 53);
+            
+            doc.setFont("helvetica", "bold");
+            doc.text(`Cargo:`, 10, 58);
+            doc.setFont("helvetica", "normal");
+            const userCargo = localStorage.getItem('user_cargo') || "AGENTE DE SUPORTE EDUCACIONAL";
+            doc.text(userCargo.toUpperCase(), 25, 58);
+            
+            doc.line(10, 60, 200, 60);
+
+            let records = [];
+            document.body.style.cursor = 'wait';
+            try {
+                const y = reportDate.getFullYear();
+                const m = reportDate.getMonth();
+                const startStr = s || new Date(y, m, 1).toISOString().split('T')[0];
+                const endStr = document.getElementById('endDate').value || new Date(y, m + 1, 0).toISOString().split('T')[0];
+
+                const token = localStorage.getItem('ponto_token');
+                if (window.API_READY) await window.API_READY;
+                const url = `/api/history?start_date=${startStr}&end_date=${endStr}`;
+                const response = await apiFetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    records = Array.isArray(data) ? data : (data.records || []);
+                } else {
+                    const cacheKey = 'cachedServerHistory_' + (getMatricula() || 'anon');
+                    const cached = localStorage.getItem(cacheKey);
+                    if (cached) records = JSON.parse(cached);
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Erro ao buscar dados.");
+            }
+            document.body.style.cursor = 'default';
+
+            const dStart = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1);
+            const dEnd = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0);
+            const fmt = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+            const mmdd = (d) => String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+            const reportData = [];
+
+            const holidaysModel = {
+                "01-01": "Feriado nacional - Confraternização Universal",
+                "04-03": "Feriado nacional - Paixão de Cristo - Amparado pelo art.1º do Decreto Nº 124-S, de 22/01/2026.",
+                "04-13": "Feriado estadual - Nossa Senhora da Penha - Amparado pelo art. 1º do Decreto Nº 124-S, de 22/01/2026.",
+                "04-21": "Feriado nacional - Tiradentes - Amparado pelo art. 1º do Decreto Nº 124-S, de 22/01/2026.",
+                "05-01": "Feriado nacional - Dia do Trabalhador",
+                "09-07": "Feriado nacional - Independência do Brasil",
+                "10-12": "Feriado nacional - Nossa Sra. Aparecida",
+                "11-02": "Feriado nacional - Finados",
+                "11-15": "Feriado nacional - Proclamação da República",
+                "12-25": "Feriado nacional - Natal"
+            };
+
+            const dayNames = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+
+            for (let d = new Date(dStart); d <= dEnd; d.setDate(d.getDate() + 1)) {
+                const dayStr = fmt(d);
+                const mdStr = mmdd(d);
+                const dayRecords = records.filter(r => r.timestamp.startsWith(dayStr));
+                const stdPunches = dayRecords.filter(r => {
+                    const t = (r.type || "").toLowerCase();
+                    return !(t.includes('atestado') || t.includes('abono') || t.includes('compensação') || t.includes('compensacao') || t.includes('saldo') || t.includes('3º turno') || t.includes('extra'));
+                });
+                
+                const groupedByType = {};
+                stdPunches.forEach(r => {
+                    const t = r.type || "";
+                    if (!groupedByType[t]) groupedByType[t] = [];
+                    groupedByType[t].push(r);
+                });
+                
+                const filteredPunchesList = [];
+                for (const t in groupedByType) {
+                    const pts = groupedByType[t];
+                    const approvedRetros = pts.filter(p => p.is_retroactive && p.is_reviewed);
+                    if (approvedRetros.length > 0) {
+                        filteredPunchesList.push(approvedRetros[approvedRetros.length - 1]);
+                    } else {
+                        filteredPunchesList.push(...pts);
+                    }
+                }
+                
+                const realPunches = filteredPunchesList.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+
+                const formatTime = (match) => {
+                    if (match && match.is_retroactive && !match.is_reviewed) return "";
+                    let time = match.timestamp.split(' ')[1].substring(0, 5);
+                    if (match.is_retroactive) time += "*";
+                    return time;
+                };
+
+                let e1 = "", s1 = "", e2 = "", s2 = "";
+                realPunches.forEach(p => {
+                    let timeStr = formatTime(p);
+                    if (!timeStr) return;
+                    const t = (p.type || "").trim();
+                    if (t === "Entrada" && !e1) e1 = timeStr;
+                    else if ((t === "Saída Almoço" || t === "Saida Almoco") && !s1) s1 = timeStr;
+                    else if ((t === "Volta Almoço" || t === "Volta Almoco") && !e2) e2 = timeStr;
+                    else if ((t === "Saída" || t === "Saida") && !s2) s2 = timeStr;
+                    else {
+                        if (!e1) e1 = timeStr;
+                        else if (!s1) s1 = timeStr;
+                        else if (!e2) e2 = timeStr;
+                        else if (!s2) s2 = timeStr;
+                    }
+                });
+
+                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                const isHoliday = holidaysModel[mdStr];
+                
+                let obs = "";
+                let mObs = [];
+                let hasAtestado = false;
+                let hasAbono = false;
+                dayRecords.forEach(r => {
+                    if (!r.is_retroactive || r.is_reviewed) {
+                        let t = (r.type || "").toLowerCase();
+                        if (t.includes('atestado')) {
+                            mObs.push("ATESTADO");
+                            hasAtestado = true;
+                        } else if (t.includes('abono')) {
+                            mObs.push("ABONO");
+                            hasAbono = true;
+                        } else if (t.includes('compensação') || t.includes('compensacao') || t.includes('saldo')) {
+                            mObs.push("COMPENSAÇÃO / USO DE SALDO");
+                        }
+                    }
+                });
+
+                if (isHoliday) {
+                    obs = isHoliday;
+                    e1 = " -- "; s1 = " -- "; e2 = " -- "; s2 = " -- ";
+                } else if (hasAtestado || hasAbono) {
+                    obs = mObs.join(' / ');
+                    e1 = " -- "; s1 = " -- "; e2 = " -- "; s2 = " -- ";
+                } else if (isWeekend && !e1 && !s1 && !e2 && !s2) {
+                    e1 = " -- "; s1 = " -- "; e2 = " -- "; s2 = " -- ";
+                    if (mObs.length > 0) obs = mObs.join(' / ');
+                } else {
+                    if (mObs.length > 0) obs = mObs.join(' / ');
+                }
+
+                reportData.push([
+                    d.getDate().toString(),
+                    dayNames[d.getDay()],
+                    e1, s1, e2, s2, obs
+                ]);
+            }
+
+            doc.autoTable({
+                startY: 64,
+                margin: { left: 10, right: 10, bottom: 10 }, 
+                head: [
+                    [
+                        { content: 'APURAÇÃO DIÁRIA', colSpan: 7, styles: { halign: 'center', fillColor: [240, 240, 240], textColor: [0,0,0], fontStyle: 'bold' } }
+                    ],
+                    [
+                        { content: 'Data', rowSpan: 2, colSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [255, 255, 255], textColor: [0,0,0] } },
+                        { content: '1º Expediente', colSpan: 2, styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0,0,0] } },
+                        { content: '2º Expediente', colSpan: 2, styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0,0,0] } },
+                        { content: 'Observações', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [255, 255, 255], textColor: [0,0,0] } }
+                    ],
+                    [
+                        { content: 'Entrada', styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0,0,0] } },
+                        { content: 'Saída', styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0,0,0] } },
+                        { content: 'Entrada', styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0,0,0] } },
+                        { content: 'Saída', styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0,0,0] } }
+                    ]
+                ],
+                body: reportData,
+                theme: 'grid',
+                styles: {
+                    fontSize: 7,
+                    cellPadding: 0.8,
+                    textColor: [0, 0, 0],
+                    lineColor: [150, 150, 150],
+                    lineWidth: 0.1,
+                    valign: 'middle'
+                },
+                columnStyles: {
+                    0: { cellWidth: 8, halign: 'center' }, // Day num
+                    1: { cellWidth: 10, halign: 'center' }, // Day name
+                    2: { cellWidth: 16, halign: 'center' }, // Ent 1
+                    3: { cellWidth: 16, halign: 'center' }, // Sai 1
+                    4: { cellWidth: 16, halign: 'center' }, // Ent 2
+                    5: { cellWidth: 16, halign: 'center' }, // Sai 2
+                    6: { cellWidth: 'auto', halign: 'left' }  // Obs
+                }
+            });
+
+            let finalY = doc.lastAutoTable.finalY + 12;
+            if (finalY > 280) {
+                doc.addPage();
+                finalY = 30;
+            }
+
+            doc.setFontSize(8);
+            var sign1 = new jsPDF.AcroForm.TextField();
+            sign1.Rect = [20, finalY, 80, 5];
+            sign1.value = userName.toUpperCase();
+            sign1.textAlign = 'center';
+            doc.addField(sign1);
+            doc.text("(assinado eletronicamente)", 60, finalY + 8, { align: 'center' });
+            
+            var sign2 = new jsPDF.AcroForm.TextField();
+            sign2.Rect = [110, finalY, 80, 5];
+            sign2.value = "TIAGO GUERCON DA SILVA";
+            sign2.textAlign = 'center';
+            doc.addField(sign2);
+            doc.text("(assinado eletronicamente)", 150, finalY + 8, { align: 'center' });
+
+            doc.save(`edocs - ${userName} - frequencia ${monthStr}-${yearStr}.pdf`);
+        }
+
+        async function downloadSiahresReport() {
+            if (!window.jspdf) { alert("Biblioteca PDF carregando..."); return; }
+            const { jsPDF } = window.jspdf;
+            // LANDSCAPE orientation (A4: 297mm x 210mm)
+            const doc = new jsPDF({ orientation: 'landscape', format: 'a4' });
+
+            // Logo (Brasao) - Load async
+            const logo = new Image();
+            logo.src = '/static/brasao.png'; // Path for Flask app
+            try {
+                await new Promise((resolve) => {
+                    if (logo.complete) return resolve();
+                    logo.onload = resolve;
+                    logo.onerror = resolve;
+                });
+                // Compact Image: x=10, y=5, w=15, h=18
+                doc.addImage(logo, 'PNG', 10, 5, 15, 18);
+            } catch (e) {
+                console.warn("Logo loading failed", e);
+            }
+
+            const userName = localStorage.getItem('user_name') || "Servidor";
+            const matricula = localStorage.getItem('matricula') || getMatricula() || "";
+            const s = document.getElementById('startDate').value;
+            let reportDate = new Date();
+            if (s) reportDate = new Date(s + "T12:00:00");
+
+            const monthNames = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
+            const monthStr = monthNames[reportDate.getMonth()];
+            const yearStr = reportDate.getFullYear();
+
+            const centerX = 297 / 2;
+
+            // Compact Header
+            doc.setFontSize(10); // Reduced
+            doc.setFont("helvetica", "bold");
+            const center = (txt, y) => doc.text(txt, centerX, y, { align: "center" });
+
+            center("GOVERNO DO ESTADO DO ESPÍRITO SANTO", 8);
+            center("SECRETARIA DE ESTADO DA EDUCAÇÃO", 12);
+            center("SRE CARAPINA", 16);
+
+            doc.setFontSize(11);
+            center("Apuração Diária de Frequência", 22);
+
+            doc.setFontSize(8);
+            doc.text("SIARHES", 285, 8, { align: "right" });
+
+            // Info Line (Compact)
+            const yInfo = 28;
+            doc.setFontSize(9);
+            const col1 = 15, col2 = 100, col3 = 160, col4 = 220;
+
+            const userCargo = localStorage.getItem('user_cargo') || "Funcionario";
+            doc.text(`Servidor(a): ${userName}`, col1, yInfo);
+            doc.text(`Matrícula: ${matricula}`, col2, yInfo);
+            doc.text(`Mês/Ano: ${monthStr} / ${yearStr}`, col3, yInfo);
+            doc.text(`Cargo: ${userCargo}`, col4, yInfo);
+
+            document.body.style.cursor = 'wait';
+            let records = [];
+            try {
+                const y = reportDate.getFullYear();
+                const m = reportDate.getMonth();
+                const startStr = s || new Date(y, m, 1).toISOString().split('T')[0];
+                const endStr = document.getElementById('endDate').value || new Date(y, m + 1, 0).toISOString().split('T')[0];
+
+                const token = localStorage.getItem('ponto_token');
+                if (window.API_READY) await window.API_READY;
+                const url = `/api/history?start_date=${startStr}&end_date=${endStr}`;
+                const response = await apiFetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    records = Array.isArray(data) ? data : (data.records || []);
+                } else {
+                    const cacheKey = 'cachedServerHistory_' + (getMatricula() || 'anon');
+                    const cached = localStorage.getItem(cacheKey);
+                    if (cached) records = JSON.parse(cached);
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Erro ao buscar dados.");
+            }
+            document.body.style.cursor = 'default';
+
+            const dStart = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1);
+            const dEnd = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0);
+            const fmt = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+            const reportData = [];
+            const justifications = []; // To store retroactive justifications
+
+            for (let d = new Date(dStart); d <= dEnd; d.setDate(d.getDate() + 1)) {
+                const dayStr = fmt(d);
+                const dayRecords = records.filter(r => r.timestamp.startsWith(dayStr));
+                
+                const stdPunches = dayRecords.filter(r => {
+                    const t = (r.type || "").toLowerCase();
+                    return !(t.includes('atestado') || t.includes('abono') || t.includes('compensação') || t.includes('compensacao') || t.includes('saldo') || t.includes('3º turno') || t.includes('extra'));
+                });
+                
+                const groupedByType = {};
+                stdPunches.forEach(r => {
+                    const t = r.type || "";
+                    if (!groupedByType[t]) groupedByType[t] = [];
+                    groupedByType[t].push(r);
+                });
+                
+                const filteredPunchesList = [];
+                for (const t in groupedByType) {
+                    const pts = groupedByType[t];
+                    const approvedRetros = pts.filter(p => p.is_retroactive && p.is_reviewed);
+                    if (approvedRetros.length > 0) {
+                        filteredPunchesList.push(approvedRetros[approvedRetros.length - 1]);
+                    } else {
+                        filteredPunchesList.push(...pts);
+                    }
+                }
+                
+                const realPunches = filteredPunchesList.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+
+                const formatTime = (match) => {
+                    if (match && match.is_retroactive && !match.is_reviewed) return "";
+                    let time = match.timestamp.split(' ')[1].substring(0, 5);
+                    if (match.is_retroactive) {
+                        time += "*";
+                        const existing = justifications.find(j => j.day === d.getDate());
+                        if (!existing) {
+                            justifications.push({ day: d.getDate(), text: match.justification || 'Ajuste Manual' });
+                        }
+                    }
+                    return time;
+                };
+
+                let e1 = "", s1 = "", e2 = "", s2 = "";
+                realPunches.forEach(p => {
+                    let timeStr = formatTime(p);
+                    if (!timeStr) return;
+                    const t = (p.type || "").trim();
+                    if (t === "Entrada" && !e1) e1 = timeStr;
+                    else if ((t === "Saída Almoço" || t === "Saida Almoco") && !s1) s1 = timeStr;
+                    else if ((t === "Volta Almoço" || t === "Volta Almoco") && !e2) e2 = timeStr;
+                    else if ((t === "Saída" || t === "Saida") && !s2) s2 = timeStr;
+                    else {
+                        if (!e1) e1 = timeStr;
+                        else if (!s1) s1 = timeStr;
+                        else if (!e2) e2 = timeStr;
+                        else if (!s2) s2 = timeStr;
+                    }
+                });
+
+                let row = [
+                    d.getDate().toString(),
+                    e1, "", s1, "",
+                    e2, "", s2, ""
+                ];
+
+                const dayOfWeek = d.getDay();
+                if ((dayOfWeek === 0 || dayOfWeek === 6) && realPunches.length === 0) {
+                    row = [d.getDate().toString(), dayOfWeek === 0 ? "DOMINGO" : "SÁBADO"];
+                }
+                reportData.push(row);
+            }
+
+            // AUTO-TABLE Compact Config
+            doc.autoTable({
+                startY: 32, // Moved up
+                margin: { left: 10, right: 10, bottom: 15 }, // Ensure space for footer
+                pageBreak: 'avoid', // Try to keep on one page (though hard limit)
+                showHead: 'everyPage', // Only if it breaks, which we want to avoid
+
+                head: [
+                    [
+                        { content: 'DIA', rowSpan: 2, styles: { valign: 'middle', halign: 'center' } },
+                        { content: 'HORÁRIO MANHÃ', colSpan: 4, styles: { halign: 'center', fillColor: [220, 220, 220] } },
+                        { content: 'HORÁRIO TARDE', colSpan: 4, styles: { halign: 'center', fillColor: [220, 220, 220] } }
+                    ],
+                    ['ENTRADA', 'ASSINATURA', 'SAÍDA', 'ASSINATURA', 'ENTRADA', 'ASSINATURA', 'SAÍDA', 'ASSINATURA'].map(t => ({ content: t, styles: { halign: 'center' } }))
+                ],
+                body: reportData,
+                theme: 'grid',
+                styles: {
+                    fontSize: 7, // Smaller font
+                    cellPadding: 0.5, // Very tight padding
+                    lineColor: [0, 0, 0],
+                    lineWidth: 0.1,
+                    textColor: [0, 0, 0],
+                    minCellHeight: 3.5, // Force compact rows
+                    valign: 'middle'
+                },
+                headStyles: {
+                    fillColor: [220, 220, 220],
+                    textColor: [0, 0, 0],
+                    fontStyle: 'bold',
+                    lineWidth: 0.1,
+                    minCellHeight: 4,
+                    fontSize: 7
+                },
+                columnStyles: {
+                    0: { cellWidth: 9, halign: 'center' }, // Dia
+                    1: { cellWidth: 15, halign: 'center' }, // T1
+                    2: { cellWidth: 51, halign: 'center' }, // Sig1
+                    3: { cellWidth: 15, halign: 'center' }, // T2
+                    4: { cellWidth: 51, halign: 'center' }, // Sig2
+                    5: { cellWidth: 15, halign: 'center' }, // T3
+                    6: { cellWidth: 51, halign: 'center' }, // Sig3
+                    7: { cellWidth: 15, halign: 'center' }, // T4
+                    8: { cellWidth: 51, halign: 'center' }  // Sig4
+                },
+                didParseCell: function (data) {
+                    if (data.section === 'body' && data.column.index === 1 && data.row.raw.length === 2) {
+                        data.cell.colSpan = 8;
+                        data.cell.styles.halign = 'center';
+                        data.cell.styles.fillColor = [240, 240, 240];
+                    }
+                }
+            });
+
+            // Signatures (Compact Layout)
+            // Use static Y if table fits, or dynamic if slight push
+            // Max Y available approx 200mm
+            let finalY = doc.lastAutoTable.finalY + 10;
+            // Force footer to bottom if lots of space, or tightly after table
+            if (finalY < 180) finalY = 180;
+            if (finalY > 195) finalY = 195; // Cap at bottom margin
+
+            doc.setLineWidth(0.1);
+            doc.setFontSize(8); // Match table font
+            const line = (x1, x2, txt, y) => { doc.line(x1, y, x2, y); doc.text(txt, (x1 + x2) / 2, y + 3, { align: 'center' }); };
+
+            line(40, 110, "ASSINATURA DO SERVIDOR", finalY);
+            line(180, 250, "ASSINATURA DA CHEFIA IMEDIATA", finalY);
+
+            // Observations Section
+            if (justifications.length > 0) {
+                let obsY = finalY + 15;
+                if (obsY > 200) {
+                    doc.addPage();
+                    obsY = 20;
+                }
+                doc.setFontSize(8);
+                doc.setFont("helvetica", "bold");
+                doc.text("(*) OBSERVAÇÕES / JUSTIFICATIVAS:", 10, obsY);
+                doc.setFont("helvetica", "normal");
+                justifications.forEach((j, idx) => {
+                    doc.text(`- Dia ${j.day}: ${j.text}`, 10, obsY + 5 + (idx * 4));
+                });
+            }
+
+            doc.save(`Frequencia_${monthStr}_${userName}.pdf`);
+        }
+
+        async function downloadMyReport() {
+            const token = localStorage.getItem('ponto_token');
+            const s = document.getElementById('startDate').value;
+            const e = document.getElementById('endDate').value;
+            let url = `/api/user/report`;
+            const params = [];
+            if (s) params.push(`start_date=${s}`);
+            if (e) params.push(`end_date=${e}`);
+            if (params.length) url += `?${params.join('&')}`;
+            try {
+                if (window.API_READY) await window.API_READY;
+                const response = await apiFetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = 'meus_registros.xlsx';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                } else {
+                    const err = await response.json().catch(() => ({}));
+                    alert('Erro ao gerar Excel: ' + (err.message || response.statusText));
+                }
+            } catch (err) {
+                alert('Erro de conexão.');
+            }
+        }
+
+        function logout() {
+            // Preserve offlineQueue, offlineUsers, and API settings.
+            // Only clear current session.
+            localStorage.removeItem('ponto_token');
+            localStorage.removeItem('user_role');
+            localStorage.removeItem('user_name');
+            localStorage.removeItem('user_cargo');
+            window.location.href = 'index.html';
+        }
+
+        function checkEndOfMonth() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = today.getMonth();
+            const lastDay = new Date(year, month + 1, 0).getDate();
+            const daysRemaining = lastDay - today.getDate();
+
+            // Warn if 3 days or less remaining (0 means today is last day)
+            if (daysRemaining <= 3) {
+                if (!sessionStorage.getItem('monthAlertShown')) {
+                    const msg = daysRemaining === 0
+                        ? `ATENÇÃO: Hoje é o ÚLTIMO DIA do mês!\n\nPor favor, exporte seus registros clicando em 'Baixar Excel' AGORA.\nA partir de amanhã, sua lista de registros começará do zero para o novo mês.`
+                        : `Atenção: Faltam apenas ${daysRemaining} dia(s) para o fim do mês.\n\nPor favor, exporte seus registros clicando em 'Baixar Excel'.\nOs dados sumirão da sua visualização no dia 1º.`;
+                    alert(msg);
+                    sessionStorage.setItem('monthAlertShown', 'true');
+                }
+            }
+        }
+    </script>
+
+</body>
+</html>

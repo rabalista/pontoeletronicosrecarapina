@@ -1,13 +1,13 @@
 // VERSION: 16.1 (Cargo-Fix) - 2026-01-31
 const API_CANDIDATES = [
+  "https://background-dakota-rain-reuters.trycloudflare.com",
+  "http://10.131.248.250:5005",
+  "http://10.129.8.144:5005",
   "https://saturday-princeton-served-membrane.trycloudflare.com",
   "http://192.168.15.2:5005",
   "https://46191d467457606d-177-157-145-64.serveousercontent.com",
   "https://nights-class-try-clinton.trycloudflare.com",
   "https://8ab41436e537247f-177-157-145-64.serveousercontent.com",
-  "https://farming-binding-referral-criteria.trycloudflare.com",
-  "https://526a1a9acc4b681d-177-157-145-64.serveousercontent.com",
-  "https://movements-pavilion-supplemental-decorative.trycloudflare.com",
 ];
 
 const BYPASS_HEADERS = {

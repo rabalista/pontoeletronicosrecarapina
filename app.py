@@ -14,6 +14,8 @@ import sqlite3
 from dotenv import load_dotenv
 import openpyxl
 from io import BytesIO
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+import calendar
 
 try:
     import pymssql
@@ -161,6 +163,8 @@ def ensure_sqlite_schema(conn):
     except: pass
     try: c.execute("ALTER TABLE Users ADD COLUMN cargo TEXT DEFAULT 'Funcionario'")
     except: pass
+    try: c.execute("ALTER TABLE Users ADD COLUMN workload TEXT DEFAULT '40h'")
+    except: pass
     c.execute("""
         CREATE TABLE IF NOT EXISTS TimeRecords (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -178,6 +182,8 @@ def ensure_sqlite_schema(conn):
             transaction_id TEXT UNIQUE,
             cargo TEXT DEFAULT 'Funcionario'
         );
+    """)
+    c.execute("""
         CREATE TABLE IF NOT EXISTS OfflineQueue (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             matricula TEXT NOT NULL,
@@ -208,7 +214,15 @@ def ensure_sqlite_schema(conn):
         ("OfflineQueue", "matricula", "TEXT"),
         ("OfflineQueue", "user_name", "TEXT"),
         ("TimeRecords", "transaction_id", "TEXT"),
-        ("OfflineQueue", "transaction_id", "TEXT")
+        ("OfflineQueue", "transaction_id", "TEXT"),
+        ("TimeRecords", "is_retroactive", "INTEGER"),
+        ("TimeRecords", "justification", "TEXT"),
+        ("TimeRecords", "document_path", "TEXT"),
+        ("OfflineQueue", "is_retroactive", "INTEGER"),
+        ("OfflineQueue", "justification", "TEXT"),
+        ("OfflineQueue", "document_path", "TEXT"),
+        ("TimeRecords", "is_reviewed", "INTEGER"),
+        ("OfflineQueue", "is_reviewed", "INTEGER")
     ]
     for table, col, col_type in new_cols:
         try:
@@ -382,6 +396,26 @@ def token_required(f):
 def index():
     return render_template('index.html')
 
+@app.route('/index.html')
+def index_html():
+    return render_template('index.html')
+
+@app.route('/config.js')
+def serve_config():
+    return send_from_directory('static', 'config.js')
+
+@app.route('/register.html')
+def register_html():
+    return render_template('register.html')
+
+@app.route('/dashboard.html')
+def dashboard_html():
+    return render_template('dashboard.html')
+
+@app.route('/admin.html')
+def admin_html():
+    return render_template('admin.html')
+
 @app.route('/health')
 def health():
     return jsonify({'status': 'ok'}), 200
@@ -409,20 +443,27 @@ def register():
     cargo = data.get('cargo')
     if not cargo:
         cargo = 'Funcionario'
+    workload = data.get('workload', '40h')
     
     conn = get_db_connection()
     ph = get_ph(conn)
     cursor = conn.cursor()
     
     try:
-        # Ensure 'cargo' column exists on SQL Server if using it
+        # Ensure 'cargo' and 'workload' column exists on SQL Server if using it
         if not isinstance(conn, sqlite3.Connection):
-            try: cursor.execute("ALTER TABLE Users ADD cargo NVARCHAR(100) DEFAULT 'Funcionario'")
+            try: 
+                cursor.execute("""
+                IF COL_LENGTH('Users', 'cargo') IS NULL BEGIN ALTER TABLE Users ADD cargo NVARCHAR(100) DEFAULT 'Funcionario' END
+                """)
+                cursor.execute("""
+                IF COL_LENGTH('Users', 'workload') IS NULL BEGIN ALTER TABLE Users ADD workload NVARCHAR(50) DEFAULT '40h' END
+                """)
+                conn.commit()
             except: pass
-            conn.commit()
 
-        query = f"INSERT INTO Users (matricula, password, name, role, cargo) VALUES ({ph}, {ph}, {ph}, {ph}, {ph})"
-        cursor.execute(query, (data['matricula'], hashed_password, data['name'], 'user', cargo))
+        query = f"INSERT INTO Users (matricula, password, name, role, cargo, workload) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph})"
+        cursor.execute(query, (data['matricula'], hashed_password, data['name'], 'user', cargo, workload))
         try: conn.commit()
         except: pass
         # mirror to local sqlite for offline login
@@ -431,8 +472,8 @@ def register():
             sconn.row_factory = sqlite3.Row
             ensure_sqlite_schema(sconn)
             scur = sconn.cursor()
-            scur.execute("INSERT OR IGNORE INTO Users (matricula, password, name, role, cargo) VALUES (?, ?, ?, ?, ?)",
-                         (data['matricula'], hashed_password, data['name'], 'user', cargo))
+            scur.execute("INSERT OR IGNORE INTO Users (matricula, password, name, role, cargo, workload) VALUES (?, ?, ?, ?, ?, ?)",
+                         (data['matricula'], hashed_password, data['name'], 'user', cargo, workload))
             sconn.commit()
             sconn.close()
         except Exception:
@@ -569,6 +610,14 @@ def punch(curr_user_mat, role):
                     # Enforce Cargo Column in TimeRecords/OfflineQueue for SQLite
                     try: curs.execute(f"ALTER TABLE {table} ADD COLUMN cargo TEXT DEFAULT 'Funcionario'")
                     except: pass
+                    try: curs.execute(f"ALTER TABLE {table} ADD COLUMN is_retroactive INTEGER DEFAULT 0")
+                    except: pass
+                    try: curs.execute(f"ALTER TABLE {table} ADD COLUMN justification TEXT")
+                    except: pass
+                    try: curs.execute(f"ALTER TABLE {table} ADD COLUMN document_path TEXT")
+                    except: pass
+                    try: curs.execute(f"ALTER TABLE {table} ADD COLUMN is_reviewed INTEGER DEFAULT 0")
+                    except: pass
                 else:
                     try: curs.execute(f"ALTER TABLE {table} ADD transaction_id NVARCHAR(100)")
                     except: pass
@@ -576,6 +625,14 @@ def punch(curr_user_mat, role):
                     except: pass
                     # Enforce Cargo Column in TimeRecords for SQL Server
                     try: curs.execute(f"ALTER TABLE {table} ADD cargo NVARCHAR(100) DEFAULT 'Funcionario'")
+                    except: pass
+                    try: curs.execute(f"ALTER TABLE {table} ADD is_retroactive INT DEFAULT 0")
+                    except: pass
+                    try: curs.execute(f"ALTER TABLE {table} ADD justification NVARCHAR(MAX)")
+                    except: pass
+                    try: curs.execute(f"ALTER TABLE {table} ADD document_path NVARCHAR(500)")
+                    except: pass
+                    try: curs.execute(f"ALTER TABLE {table} ADD is_reviewed INT DEFAULT 0")
                     except: pass
             db_conn.commit()
         except: pass
@@ -632,6 +689,9 @@ def punch(curr_user_mat, role):
              if r: user_cargo = r[0] or 'Funcionario'
     except: pass
     
+    is_retro_flag = 1 if any(word in data['type'].lower() for word in ['atestado', 'abono', 'compensação', 'compensacao', 'justificativa', 'uso de saldo']) else 0
+    justification_val = "Lançado via Registro Rápido" if is_retro_flag else None
+
     # If using SQL Server OR if we are in local VS Code mode (USE_SQLITE is true)
     # the receipt of a /api/punch request means we should save to TimeRecords immediately.
     # But now, "Online" means SQL Server is reachable.
@@ -645,7 +705,7 @@ def punch(curr_user_mat, role):
                     ('latitude', 'FLOAT'), ('longitude', 'FLOAT'), ('accuracy', 'FLOAT'), 
                     ('neighborhood', 'NVARCHAR(255)'), ('city', 'NVARCHAR(255)'), 
                     ('full_address', 'NVARCHAR(500)'), ('user_name', 'NVARCHAR(255)'),
-                    ('cargo', 'NVARCHAR(100)')
+                    ('cargo', 'NVARCHAR(100)'), ('is_retroactive', 'INT'), ('justification', 'NVARCHAR(MAX)')
                 ]:
                     try: cursor.execute(f"ALTER TABLE TimeRecords ADD {col} {col_type}")
                     except: pass
@@ -653,14 +713,14 @@ def punch(curr_user_mat, role):
 
             query = f"""
                 INSERT INTO TimeRecords 
-                (user_id, matricula, record_type, timestamp, latitude, longitude, accuracy, neighborhood, city, full_address, user_name, transaction_id, cargo) 
-                VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                (user_id, matricula, record_type, timestamp, latitude, longitude, accuracy, neighborhood, city, full_address, user_name, transaction_id, cargo, is_retroactive, justification) 
+                VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
             """
             cursor.execute(query, (
                 sync_user_id, user_matricula, data['type'], current_time, 
                 data.get('latitude'), data.get('longitude'), data.get('accuracy'), 
                 data.get('neighborhood'), data.get('city'), data.get('full_address'),
-                user_name, transaction_id, user_cargo
+                user_name, transaction_id, user_cargo, is_retro_flag, justification_val
             ))
             # Mark as successfully online
             inserted_online = True
@@ -673,10 +733,10 @@ def punch(curr_user_mat, role):
                     # Include Cargo in mirror
                     qconn.execute("""
                         INSERT OR IGNORE INTO TimeRecords 
-                        (user_id, matricula, user_name, record_type, neighborhood, city, latitude, longitude, accuracy, full_address, timestamp, transaction_id, cargo) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        (user_id, matricula, user_name, record_type, neighborhood, city, latitude, longitude, accuracy, full_address, timestamp, transaction_id, cargo, is_retroactive, justification) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (sync_user_id, user_matricula, user_name, data['type'], data.get('neighborhood'), data.get('city'), 
-                          data.get('latitude'), data.get('longitude'), data.get('accuracy'), data.get('full_address'), current_time, transaction_id, user_cargo))
+                          data.get('latitude'), data.get('longitude'), data.get('accuracy'), data.get('full_address'), current_time, transaction_id, user_cargo, is_retro_flag, justification_val))
                     qconn.commit()
                     qconn.close()
                 except Exception as mir_err:
@@ -698,8 +758,8 @@ def punch(curr_user_mat, role):
             except: pass
             
             scur = sconn.cursor()
-            scur.execute("INSERT OR IGNORE INTO OfflineQueue (matricula, record_type, timestamp, latitude, longitude, accuracy, neighborhood, city, full_address, transaction_id, cargo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
-                         (user_matricula, data['type'], current_time, data.get('latitude'), data.get('longitude'), data.get('accuracy'), data.get('neighborhood'), data.get('city'), data.get('full_address'), transaction_id, user_cargo))
+            scur.execute("INSERT OR IGNORE INTO OfflineQueue (matricula, record_type, timestamp, latitude, longitude, accuracy, neighborhood, city, full_address, transaction_id, cargo, is_retroactive, justification) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
+                         (user_matricula, data['type'], current_time, data.get('latitude'), data.get('longitude'), data.get('accuracy'), data.get('neighborhood'), data.get('city'), data.get('full_address'), transaction_id, user_cargo, is_retro_flag, justification_val))
             sconn.commit()
             sconn.close()
         except Exception as e:
@@ -711,6 +771,118 @@ def punch(curr_user_mat, role):
     try: conn.close()
     except: pass
     return jsonify({'message': 'Ponto registrado com sucesso!', 'offline': not inserted_online}), 201
+
+from werkzeug.utils import secure_filename
+
+@app.route('/api/punch/retroactive', methods=['POST'])
+@token_required
+def punch_retroactive(curr_user_mat, role):
+    conn = get_db_connection()
+    is_sqlite = isinstance(conn, sqlite3.Connection)
+    ph = get_ph(conn)
+
+    # From multipart form
+    record_type = request.form.get('type')
+    datetime_str = request.form.get('datetime')  # Ex: "2026-04-01T08:00"
+    justification = request.form.get('justification', '')
+    
+    if not record_type or not datetime_str:
+        return jsonify({'message': 'Tipo e Data/Hora são obrigatórios'}), 400
+
+    try:
+        current_time = datetime.datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M")
+    except ValueError:
+        return jsonify({'message': 'Data e hora inválidas'}), 400
+
+    document_path = None
+    if 'document' in request.files:
+        file = request.files['document']
+        if file and file.filename:
+            os.makedirs(os.path.join('static', 'uploads'), exist_ok=True)
+            original_ext = os.path.splitext(file.filename)[1]
+            safe_name = secure_filename(f"{curr_user_mat}_{current_time.strftime('%Y%m%d%H%M%S')}{original_ext}")
+            doc_path = os.path.join('static', 'uploads', safe_name)
+            file.save(doc_path)
+            document_path = doc_path
+
+    transaction_id = 'retro_' + str(int(time.time() * 1000)) + str(curr_user_mat)
+
+    # Identifiers
+    user_matricula = curr_user_mat
+    sql_user_id, user_name = get_user_info_by_matricula(user_matricula, conn)
+    
+    lconn = sqlite3.connect(sqlite_path)
+    lconn.row_factory = sqlite3.Row
+    local_user_id, l_user_name = get_user_info_by_matricula(user_matricula, lconn)
+    lconn.close()
+    
+    if not user_name: user_name = l_user_name
+    sync_user_id = sql_user_id if sql_user_id else local_user_id
+    
+    user_cargo = 'Funcionario'
+    try:
+        if sql_user_id:
+             c_cur = conn.cursor()
+             nolock = "" if is_sqlite else "WITH (NOLOCK)"
+             c_cur.execute(f"SELECT cargo FROM Users {nolock} WHERE id = {ph}", (sql_user_id,))
+             r = c_cur.fetchone()
+             if r: user_cargo = rf(r, 'cargo') or 'Funcionario'
+        else:
+             lconn = sqlite3.connect(sqlite_path)
+             lcur = lconn.cursor()
+             lcur.execute("SELECT cargo FROM Users WHERE matricula = ?", (user_matricula,))
+             r = lcur.fetchone()
+             lconn.close()
+             if r: user_cargo = r[0] or 'Funcionario'
+    except: pass
+
+    inserted_online = False
+    
+    if (not is_sqlite and DB_ONLINE) or USE_SQLITE:
+        try:
+            cursor = conn.cursor()
+            query = f"""
+                INSERT INTO TimeRecords 
+                (user_id, matricula, record_type, timestamp, latitude, longitude, accuracy, neighborhood, city, full_address, user_name, transaction_id, cargo, is_retroactive, justification, document_path) 
+                VALUES ({ph}, {ph}, {ph}, {ph}, NULL, NULL, NULL, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, 1, {ph}, {ph})
+            """
+            cursor.execute(query, (
+                sync_user_id, user_matricula, record_type, current_time, 
+                "Retroativo", "Justificativa Manual", "Ajuste Manual",
+                user_name, transaction_id, user_cargo, justification, document_path
+            ))
+            inserted_online = True
+            
+            if not is_sqlite:
+                try:
+                    qconn = sqlite3.connect(sqlite_path); qconn.row_factory = sqlite3.Row; ensure_sqlite_schema(qconn)
+                    qconn.execute("""
+                        INSERT OR IGNORE INTO TimeRecords 
+                        (user_id, matricula, user_name, record_type, neighborhood, city, full_address, timestamp, transaction_id, cargo, is_retroactive, justification, document_path) 
+                        VALUES (?, ?, ?, ?, 'Retroativo', 'Justificativa Manual', 'Ajuste Manual', ?, ?, ?, 1, ?, ?)
+                    """, (sync_user_id, user_matricula, user_name, record_type, current_time, transaction_id, user_cargo, justification, document_path))
+                    qconn.commit()
+                    qconn.close()
+                except: pass
+        except Exception as e:
+            print(f"Online retroactive insert failed: {e}")
+
+    if not inserted_online:
+        try:
+            sconn = sqlite3.connect(sqlite_path)
+            ensure_sqlite_schema(sconn)
+            scur = sconn.cursor()
+            scur.execute("INSERT OR IGNORE INTO OfflineQueue (matricula, record_type, timestamp, neighborhood, city, full_address, transaction_id, cargo, is_retroactive, justification, document_path) VALUES (?, ?, ?, 'Retroativo', 'Justificativa Manual', 'Ajuste Manual', ?, ?, 1, ?, ?)", 
+                         (user_matricula, record_type, current_time, transaction_id, user_cargo, justification, document_path))
+            sconn.commit()
+            sconn.close()
+        except Exception as e:
+            return jsonify({'message': f'Erro ao salvar ponto retroativo: {str(e)}'}), 500
+
+    try: conn.close()
+    except: pass
+    return jsonify({'message': 'Ponto retroativo registrado com sucesso!', 'offline': not inserted_online}), 201
+    
 
 @app.route('/api/history', methods=['GET'])
 @token_required
@@ -781,7 +953,7 @@ def history(curr_user_mat, role):
             nolock = "" if is_sqlite else "WITH (NOLOCK)"
             if not is_sqlite:
                 cursor.execute(f"""
-                    SELECT record_type, timestamp, neighborhood, city, transaction_id
+                    SELECT record_type, timestamp, neighborhood, city, transaction_id, is_retroactive, justification, document_path, is_reviewed
                     FROM TimeRecords {nolock}
                     WHERE matricula = {ph} 
                       AND timestamp >= DATEADD(day, -90, GETDATE())
@@ -804,7 +976,11 @@ def history(curr_user_mat, role):
                             'neighborhood': rf(row, 'neighborhood'),
                             'city': rf(row, 'city'),
                             'pending': False,
-                            'transaction_id': tx_id
+                            'transaction_id': tx_id,
+                            'is_retroactive': bool(rf(row, 'is_retroactive')),
+                            'is_reviewed': bool(rf(row, 'is_reviewed')),
+                            'justification': rf(row, 'justification'),
+                            'document_path': rf(row, 'document_path')
                         })
         except Exception as e:
             print(f"DEBUG: SQL Fetch failed: {e}")
@@ -817,7 +993,7 @@ def history(curr_user_mat, role):
             lcur = lconn.cursor()
             print(f"DEBUG: Querying local history for matricula={user_matricula}")
             lcur.execute(f"""
-                SELECT record_type, timestamp, neighborhood, city, transaction_id
+                SELECT record_type, timestamp, neighborhood, city, transaction_id, is_retroactive, justification, document_path, is_reviewed
                 FROM TimeRecords 
                 WHERE matricula = ? 
                   AND timestamp >= date('now', '-90 days')
@@ -841,7 +1017,11 @@ def history(curr_user_mat, role):
                         'neighborhood': rf(row, 'neighborhood'),
                         'city': rf(row, 'city'),
                         'pending': False,
-                        'transaction_id': tx_id
+                        'transaction_id': tx_id,
+                        'is_retroactive': bool(rf(row, 'is_retroactive')),
+                        'is_reviewed': bool(rf(row, 'is_reviewed')),
+                        'justification': rf(row, 'justification'),
+                        'document_path': rf(row, 'document_path')
                     })
             lconn.close()
         except:
@@ -1042,16 +1222,32 @@ def get_users(curr_user_mat, role):
         cursor = conn.cursor()
         is_sqlite = isinstance(conn, sqlite3.Connection)
         nolock = "" if is_sqlite else "WITH (NOLOCK)"
-        cursor.execute(f"SELECT id, matricula, name, role, cargo FROM Users {nolock}")
-        rows = cursor.fetchall()
+        if not is_sqlite:
+            try:
+                cursor.execute("""
+                IF COL_LENGTH('Users', 'workload') IS NULL BEGIN ALTER TABLE Users ADD workload NVARCHAR(50) DEFAULT '40h' END
+                """)
+                conn.commit()
+            except: pass
+        
+        try:
+            cursor.execute(f"SELECT id, matricula, name, role, cargo, workload FROM Users {nolock}")
+            rows = cursor.fetchall()
+        except:
+            cursor.execute(f"SELECT id, matricula, name, role, cargo FROM Users {nolock}")
+            rows = cursor.fetchall()
+            
         users = []
         for r in rows:
+            w = rf(r, 'workload')
+            if not w: w = '40h'
             users.append({
                 'id': rf(r, 'id'),
                 'matricula': rf(r, 'matricula'),
                 'name': rf(r, 'name'),
                 'role': rf(r, 'role'),
-                'cargo': rf(r, 'cargo')
+                'cargo': rf(r, 'cargo'),
+                'workload': w
             })
         return jsonify(users)
     finally:
@@ -1071,6 +1267,7 @@ def create_user_admin(curr_user_mat, role):
     password_raw = data.get('password')
     new_role = data.get('role', 'user')
     cargo = data.get('cargo')
+    workload = data.get('workload', '40h')
     if not cargo:
         cargo = 'Funcionario'
     if not matricula or not name or not password_raw:
@@ -1079,11 +1276,21 @@ def create_user_admin(curr_user_mat, role):
     hashed = bcrypt.hashpw(password_raw.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     conn = get_db_connection()
     ph = get_ph(conn)
+    is_sqlite = isinstance(conn, sqlite3.Connection)
     try:
         cursor = conn.cursor()
-        query = f"INSERT INTO Users (matricula, password, name, role, cargo) VALUES ({ph}, {ph}, {ph}, {ph}, {ph})"
-        cursor.execute(query, (matricula, hashed, name, new_role, cargo))
-        if isinstance(conn, sqlite3.Connection):
+        if not is_sqlite:
+            try:
+                cursor.execute("""
+                IF COL_LENGTH('Users', 'workload') IS NULL BEGIN ALTER TABLE Users ADD workload NVARCHAR(50) DEFAULT '40h' END
+                """)
+                conn.commit()
+            except: pass
+
+        query = f"INSERT INTO Users (matricula, password, name, role, cargo, workload) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph})"
+        cursor.execute(query, (matricula, hashed, name, new_role, cargo, workload))
+            
+        if is_sqlite:
             conn.commit()
         elif ph == '?': 
             conn.commit()
@@ -1092,7 +1299,7 @@ def create_user_admin(curr_user_mat, role):
             sconn = sqlite3.connect(sqlite_path)
             scur = sconn.cursor()
             ensure_sqlite_schema(sconn)
-            scur.execute("INSERT OR REPLACE INTO Users (matricula, password, name, role, cargo) VALUES (?, ?, ?, ?, ?)", (matricula, hashed, name, new_role, cargo))
+            scur.execute("INSERT OR REPLACE INTO Users (matricula, password, name, role, cargo, workload) VALUES (?, ?, ?, ?, ?, ?)", (matricula, hashed, name, new_role, cargo, workload))
             sconn.commit()
             sconn.close()
         except: pass
@@ -1130,6 +1337,9 @@ def update_user(curr_user_mat, role, user_id):
     if 'cargo' in data: # allow updating cargo even to empty if desired, or check for value
         fields.append(f'cargo = {ph}')
         values.append(data['cargo'])
+    if 'workload' in data:
+        fields.append(f'workload = {ph}')
+        values.append(data['workload'])
     if 'password' in data and data['password']:
         hashed = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         fields.append(f'password = {ph}')
@@ -1165,6 +1375,7 @@ def update_user(curr_user_mat, role, user_id):
                 if 'name' in data: lfields.append("name = ?"); lvals.append(data['name'])
                 if 'role' in data: lfields.append("role = ?"); lvals.append(data['role'])
                 if 'cargo' in data: lfields.append("cargo = ?"); lvals.append(data['cargo'])
+                if 'workload' in data: lfields.append("workload = ?"); lvals.append(data['workload'])
                 if hashed: lfields.append("password = ?"); lvals.append(hashed)
                 if lfields:
                     lvals.append(old_mat)
@@ -1200,6 +1411,8 @@ def delete_user(curr_user_mat, role, user_id):
         mat = rf(row, 'matricula') if row else None
         
         cursor.execute(f"DELETE FROM TimeRecords WHERE user_id = {ph}", (user_id,))
+        if mat:
+            cursor.execute(f"DELETE FROM TimeRecords WHERE matricula = {ph}", (mat,))
         cursor.execute(f"DELETE FROM Users WHERE id = {ph}", (user_id,))
         if is_sqlite or ph == '?': conn.commit()
         
@@ -1208,6 +1421,9 @@ def delete_user(curr_user_mat, role, user_id):
                 sconn = sqlite3.connect(sqlite_path)
                 scur = sconn.cursor()
                 scur.execute("DELETE FROM Users WHERE matricula = ?", (mat,))
+                scur.execute("DELETE FROM TimeRecords WHERE matricula = ?", (mat,))
+                try: scur.execute("DELETE FROM OfflineQueue WHERE matricula = ?", (mat,))
+                except: pass
                 sconn.commit()
                 sconn.close()
             except: pass
@@ -1240,6 +1456,10 @@ def bulk_delete_users(curr_user_mat, role):
         mats = [rf(r, 'matricula') for r in cursor.fetchall()]
         
         cursor.execute(f"DELETE FROM TimeRecords WHERE user_id IN ({placeholders})", tuple(ids))
+        if mats:
+            m_ph_conn = ', '.join([ph]*len(mats))
+            cursor.execute(f"DELETE FROM TimeRecords WHERE matricula IN ({m_ph_conn})", tuple(mats))
+        
         cursor.execute(f"DELETE FROM Users WHERE id IN ({placeholders})", tuple(ids))
         if is_sqlite or ph == '?': conn.commit()
         
@@ -1249,10 +1469,115 @@ def bulk_delete_users(curr_user_mat, role):
                 scur = sconn.cursor()
                 m_ph = ', '.join(['?']*len(mats))
                 scur.execute(f"DELETE FROM Users WHERE matricula IN ({m_ph})", tuple(mats))
+                scur.execute(f"DELETE FROM TimeRecords WHERE matricula IN ({m_ph})", tuple(mats))
+                try: scur.execute(f"DELETE FROM OfflineQueue WHERE matricula IN ({m_ph})", tuple(mats))
+                except: pass
                 sconn.commit()
                 sconn.close()
             except: pass
         return jsonify({'message': f'{len(ids)} excluídos'}), 200
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
+@app.route('/api/admin/retroactive', methods=['GET'])
+@token_required
+def get_retroactive_punches(curr_user_mat, role):
+    if role != 'admin':
+        return jsonify({'message': 'Unauthorized'}), 401
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        is_sqlite = isinstance(conn, sqlite3.Connection)
+        ph = get_ph(conn)
+        nolock = "" if is_sqlite else "WITH (NOLOCK)"
+        
+        # We look for records that are retroactive and haven't been reviewed yet (is_reviewed = 0 or NULL)
+        query = f"""
+            SELECT id, matricula, user_name, record_type, timestamp, neighborhood, city, 
+                   full_address, transaction_id, cargo, is_retroactive, justification, document_path
+            FROM TimeRecords {nolock}
+            WHERE is_retroactive = 1 AND (is_reviewed = 0 OR is_reviewed IS NULL)
+            ORDER BY timestamp DESC
+        """
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        retro_records = []
+        for r in rows:
+            ts = rf(r, 'timestamp')
+            if isinstance(ts, datetime.datetime):
+                ts = ts.strftime('%Y-%m-%d %H:%M:%S')
+            retro_records.append({
+                'id': rf(r, 'id'),
+                'matricula': rf(r, 'matricula'),
+                'user_name': rf(r, 'user_name'),
+                'type': rf(r, 'record_type'),
+                'timestamp': ts,
+                'neighborhood': rf(r, 'neighborhood'),
+                'city': rf(r, 'city'),
+                'full_address': rf(r, 'full_address'),
+                'transaction_id': rf(r, 'transaction_id'),
+                'cargo': rf(r, 'cargo'),
+                'justification': rf(r, 'justification'),
+                'document_path': rf(r, 'document_path')
+            })
+        return jsonify(retro_records)
+    finally:
+        try: conn.close()
+        except: pass
+
+@app.route('/api/admin/record/<transaction_id>/approve', methods=['POST'])
+@token_required
+def approve_retroactive_punch(curr_user_mat, role, transaction_id):
+    if role != 'admin':
+        return jsonify({'message': 'Unauthorized'}), 401
+    conn = get_db_connection()
+    ph = get_ph(conn)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(f"UPDATE TimeRecords SET is_reviewed = 1 WHERE transaction_id = {ph}", (transaction_id,))
+        if isinstance(conn, sqlite3.Connection) or ph == '?':
+            conn.commit()
+            
+        # Also mirror to local sqlite if online
+        try:
+            sconn = sqlite3.connect(sqlite_path)
+            sconn.execute("UPDATE TimeRecords SET is_reviewed = 1 WHERE transaction_id = ?", (transaction_id,))
+            sconn.commit()
+            sconn.close()
+        except: pass
+        
+        return jsonify({'message': 'Ponto aprovado com sucesso!'})
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
+@app.route('/api/admin/record/<transaction_id>', methods=['DELETE'])
+@token_required
+def delete_record(curr_user_mat, role, transaction_id):
+    if role != 'admin':
+        return jsonify({'message': 'Unauthorized'}), 401
+    conn = get_db_connection()
+    ph = get_ph(conn)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(f"DELETE FROM TimeRecords WHERE transaction_id = {ph}", (transaction_id,))
+        if isinstance(conn, sqlite3.Connection) or ph == '?':
+            conn.commit()
+            
+        # Also mirror to local sqlite if online
+        try:
+            sconn = sqlite3.connect(sqlite_path)
+            sconn.execute("DELETE FROM TimeRecords WHERE transaction_id = ?", (transaction_id,))
+            sconn.commit()
+            sconn.close()
+        except: pass
+        
+        return jsonify({'message': 'Registro excluído com sucesso!'})
     except Exception as e:
         return jsonify({'message': str(e)}), 500
     finally:
@@ -1373,7 +1698,8 @@ def get_admin_report_excel(curr_user_mat, role):
         query = """
             SELECT t.matricula, t.user_name AS name,
                    t.record_type, t.timestamp, t.neighborhood, t.city,
-                   t.latitude, t.longitude, t.accuracy, t.full_address
+                   t.latitude, t.longitude, t.accuracy, t.full_address,
+                   t.is_retroactive, t.justification, t.document_path, t.is_reviewed
             FROM TimeRecords t
         """
         params = []
@@ -1389,38 +1715,201 @@ def get_admin_report_excel(curr_user_mat, role):
              # Return raw data for frontend PDF generation
              records = []
              for r in rows:
+                 ts = rf(r, 'timestamp')
+                 if isinstance(ts, datetime.datetime):
+                     ts = ts.strftime('%Y-%m-%d %H:%M:%S')
+                 else:
+                     ts = str(ts)
+                 
                  records.append({
                      'matricula': rf(r, 'matricula'),
                      'name': rf(r, 'name'),
                      'type': rf(r, 'record_type'),
-                     'timestamp': rf(r, 'timestamp'),
+                     'timestamp': ts,
                      'neighborhood': rf(r, 'neighborhood'),
                      'city': rf(r, 'city'),
-                     'full_address': rf(r, 'full_address')
+                     'full_address': rf(r, 'full_address'),
+                     'is_retroactive': bool(rf(r, 'is_retroactive')),
+                     'is_reviewed': bool(rf(r, 'is_reviewed')),
+                     'justification': rf(r, 'justification'),
+                     'document_path': rf(r, 'document_path')
                  })
              return jsonify(records)
         
-        # Build Cargo Map
+        # Build Cargo and Workload Map
         cargo_map = {}
+        workload_map = {}
         try:
             c_conn = get_db_connection()
             c_cur = c_conn.cursor()
             nolock = "" if isinstance(c_conn, sqlite3.Connection) else "WITH (NOLOCK)"
-            c_cur.execute(f"SELECT matricula, cargo FROM Users {nolock}")
+            c_cur.execute(f"SELECT matricula, cargo, workload FROM Users {nolock}")
             for cr in c_cur.fetchall():
-                cargo_map[rf(cr, 'matricula')] = rf(cr, 'cargo')
+                mat = rf(cr, 'matricula')
+                cargo_map[mat] = rf(cr, 'cargo')
+                workload_map[mat] = rf(cr, 'workload')
             c_conn.close()
         except: pass
 
         wb = openpyxl.Workbook()
         if target_user_id:
-            ws = wb.active
-            ws.title = "Relatorio"
-            ws.append(["Matricula", "Nome", "Cargo", "Tipo", "Data/Hora", "Bairro", "Cidade", "Latitude", "Longitude", "Precisão (m)", "Endereço Completo"])
-            for r in rows:
-                mat = rf(r,'matricula')
-                c = cargo_map.get(mat, 'Funcionario')
-                ws.append([mat, rf(r,'name'), c, rf(r,'record_type'), rf(r,'timestamp'), rf(r,'neighborhood'), rf(r,'city'), rf(r,'latitude'), rf(r,'longitude'), rf(r,'accuracy'), rf(r,'full_address')])
+            try:
+                user_records = list(rows)
+                user_records.reverse() # chronological
+                
+                target_mat = rf(user_records[0], 'matricula') if user_records else None
+                user_workload = workload_map.get(target_mat, '40h') or '40h'
+                daily_hours = 8
+                if '30h' in str(user_workload): daily_hours = 6
+                elif '50h' in str(user_workload): daily_hours = 10
+                user_cargo = cargo_map.get(target_mat, 'xxx')
+                user_name = rf(user_records[0], 'name') if user_records else "Desconhecido"
+                
+                # Determine year
+                m_year = datetime.datetime.now().year
+                if user_records:
+                    ts = rf(user_records[-1], 'timestamp')
+                    if ts:
+                        dtt = ts if isinstance(ts, datetime.datetime) else datetime.datetime.strptime(str(ts).split('.')[0], '%Y-%m-%d %H:%M:%S')
+                        m_year = dtt.year
+                    
+                months_data = {}
+                for r in user_records:
+                    ts = rf(r, 'timestamp')
+                    if not ts: continue
+                    dt = ts if isinstance(ts, datetime.datetime) else datetime.datetime.strptime(str(ts).split('.')[0], '%Y-%m-%d %H:%M:%S')
+                    if dt.year != m_year: continue # Export only one year per file
+                    month_key = dt.strftime('%Y-%m')
+                    if month_key not in months_data: months_data[month_key] = {"days": {}}
+                    
+                    day_key = dt.strftime('%Y-%m-%d')
+                    if day_key not in months_data[month_key]["days"]: months_data[month_key]["days"][day_key] = []
+                    months_data[month_key]["days"][day_key].append({'type': rf(r, 'record_type'), 'time': dt, 'is_retroactive': rf(r, 'is_retroactive'), 'is_reviewed': rf(r, 'is_reviewed')})
+
+                import os, calendar, traceback
+                try:
+                    base_d = os.path.abspath(os.path.dirname(__file__))
+                    template_path = os.path.join(base_d, "PADRAO 8 HS.xlsx")
+                    wb = openpyxl.load_workbook(template_path)
+                except Exception as ex_open:
+                    with open(os.path.join(base_d, "backend.log"), "a") as flog: flog.write(f"\nError loading template: {ex_open}\n")
+                    wb = openpyxl.Workbook() # Fallback if template missing
+
+                month_names = ["JAN", "FEV", "MAR", "ABR", "MAIO", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"]
+                
+                for m_idx, m_name in enumerate(month_names):
+                    m_num = m_idx + 1
+                    if m_name in wb.sheetnames:
+                        ws = wb[m_name]
+                        ws['K6'] = datetime.datetime(m_year, m_num, 1)
+                        ws['C6'] = user_name
+                        ws['C7'] = user_cargo
+                        ws['L10'] = target_mat
+                        ws['L7'] = datetime.time(daily_hours, 0)
+                        ws['N9'] = m_year
+                        ws['J13'] = 'saída EXTRA'
+                        ws['K13'] = 'entrada EXTRA'
+                        
+                        m_key = f"{m_year}-{m_num:02d}"
+                        month_data = months_data.get(m_key, {"days": {}})
+                        num_days = calendar.monthrange(m_year, m_num)[1]
+                        
+                        for d_idx in range(1, num_days + 1):
+                            row_idx = 13 + d_idx
+                            d_key_str = f"{m_year}-{m_num:02d}-{d_idx:02d}"
+                            punches = month_data["days"].get(d_key_str, [])
+                            
+                            has_atestado = False
+                            has_abono = False
+                            has_comp = False
+                            ent_m, sai_m, ent_t, sai_t, ent_x, sai_x = None, None, None, None, None, None
+                            
+                            if len(punches) > 0:
+                                punches.sort(key=lambda x: x['time'])
+                                real_punches = []
+                                for p in punches:
+                                    t_val = p['time'].time() if isinstance(p['time'], datetime.datetime) else None
+                                    if not t_val: continue
+                                    
+                                    t_str = (p['type'] or "").lower()
+                                    if 'atestado' in t_str and 'dia todo' in t_str:
+                                        has_atestado = True
+                                    elif 'abono' in t_str and 'dia todo' in t_str:
+                                        has_abono = True
+                                    elif 'compensação' in t_str or 'compensacao' in t_str or 'saldo' in t_str or 'abono' in t_str or 'atestado' in t_str:
+                                        has_comp = True
+                                    else:
+                                        real_punches.append(p)
+                                
+                                # Process corrections: if there is an approved retroactive punch of a certain type,
+                                # it overrides any non-retroactive punch of the SAME type.
+                                final_punches = []
+                                grouped_by_type = {}
+                                for p in real_punches:
+                                    t = p['type']
+                                    if t not in grouped_by_type:
+                                        grouped_by_type[t] = []
+                                    grouped_by_type[t].append(p)
+                                
+                                for t, pts in grouped_by_type.items():
+                                    approved_retros = [p for p in pts if p.get('is_retroactive') and p.get('is_reviewed')]
+                                    if approved_retros:
+                                        # If there are approved retroactives for this type, only keep those (usually just 1)
+                                        final_punches.extend(approved_retros)
+                                    else:
+                                        # Otherwise keep all regular punches of this type
+                                        final_punches.extend(pts)
+                                
+                                final_punches.sort(key=lambda x: x['time'])
+                                
+                                standard_punches = [p for p in final_punches if '3º turno' not in (p['type'] or "").lower()]
+                                extra_punches = [p for p in final_punches if '3º turno' in (p['type'] or "").lower()]
+                                
+                                # Sequential assignment for standard punches
+                                for i, p in enumerate(standard_punches[:4]):
+                                    t_val = p['time'].time() if isinstance(p['time'], datetime.datetime) else None
+                                    if i == 0: ent_m = t_val
+                                    elif i == 1: sai_m = t_val
+                                    elif i == 2: ent_t = t_val
+                                    elif i == 3: sai_t = t_val
+                                
+                                # Assignment for extra punches (bank/doctor absence)
+                                for p in extra_punches:
+                                    t_val = p['time'].time() if isinstance(p['time'], datetime.datetime) else None
+                                    t_str = (p['type'] or "").lower()
+                                    if 'saída extra' in t_str or 'saida extra' in t_str:
+                                        ent_x = t_val # Column J
+                                    elif 'entrada extra' in t_str:
+                                        sai_x = t_val # Column K
+                            
+                            if has_comp:
+                                if ent_m is None: ent_m = datetime.time(0, 0)
+                                if sai_m is None: sai_m = datetime.time(0, 0)
+                                if ent_t is None: ent_t = datetime.time(0, 0)
+                                if sai_t is None: sai_t = datetime.time(0, 0)
+
+                            # Always write the times if they exist
+                            if ent_m is not None: ws.cell(row=row_idx, column=6, value=ent_m).number_format = 'hh:mm:ss'
+                            if sai_m is not None: ws.cell(row=row_idx, column=7, value=sai_m).number_format = 'hh:mm:ss'
+                            if ent_t is not None: ws.cell(row=row_idx, column=8, value=ent_t).number_format = 'hh:mm:ss'
+                            if sai_t is not None: ws.cell(row=row_idx, column=9, value=sai_t).number_format = 'hh:mm:ss'
+                            if ent_x is not None: ws.cell(row=row_idx, column=10, value=ent_x).number_format = 'hh:mm:ss'
+                            if sai_x is not None: ws.cell(row=row_idx, column=11, value=sai_x).number_format = 'hh:mm:ss'
+                            
+                            # Overwrite formula in L to SUBTRACT the extra shift (absence)
+                            ws.cell(row=row_idx, column=12, value=f'=IF(A{row_idx}="U",(G{row_idx}-F{row_idx})+(I{row_idx}-H{row_idx})-(K{row_idx}-J{row_idx}),"NÃO ÚTIL")')
+
+                            if has_atestado or has_abono:
+                                val_str = "ATESTADO" if has_atestado else "ABONO"
+                                ws.cell(row=row_idx, column=12, value=val_str)
+                                ws.cell(row=row_idx, column=13, value=val_str)
+                                ws.cell(row=row_idx, column=14, value=val_str)
+                                ws.cell(row=row_idx, column=16, value=0)
+            except Exception as e_main:
+                import traceback, os
+                with open(os.path.join(os.path.abspath(os.path.dirname(__file__)), "backend.log"), "a") as flog:
+                    flog.write(f"\nCRITICAL EXCEL ERROR:\n{traceback.format_exc()}\n")
+                raise e_main
         else:
             wb.remove(wb.active)
             groups = {}
@@ -1429,17 +1918,24 @@ def get_admin_report_excel(curr_user_mat, role):
                 groups.setdefault(k, []).append(r)
             for (m, n), items in groups.items():
                 ws = wb.create_sheet(title=(n or m or "User")[:30])
-                ws.append(["Matricula", "Nome", "Cargo", "Tipo", "Data/Hora", "Bairro", "Cidade", "Latitude", "Longitude", "Precisão (m)", "Endereço Completo"])
+                ws.append(["Matricula", "Nome", "Cargo", "Tipo", "Data/Hora", "Bairro", "Cidade", "Latitude", "Longitude", "Precisão (m)", "Endereço Completo", "Manual?", "Justificativa", "Anexo"])
                 for r in items:
                     mat = rf(r,'matricula')
                     c = cargo_map.get(mat, 'Funcionario')
-                    ws.append([mat, rf(r,'name'), c, rf(r,'record_type'), rf(r,'timestamp'), rf(r,'neighborhood'), rf(r,'city'), rf(r,'latitude'), rf(r,'longitude'), rf(r,'accuracy'), rf(r,'full_address')])
+                    ws.append([mat, rf(r,'name'), c, rf(r,'record_type'), rf(r,'timestamp'), rf(r,'neighborhood'), rf(r,'city'), rf(r,'latitude'), rf(r,'longitude'), rf(r,'accuracy'), rf(r,'full_address'), 'Sim' if rf(r,'is_retroactive') else 'Não', rf(r,'justification') or '', rf(r,'document_path') or ''])
         
         out = BytesIO()
         wb.save(out)
         out.seek(0)
-        return send_file(out, download_name="relatorio_admin.xlsx", as_attachment=True)
+        
+        fname = "Relatorio_Geral.xlsx"
+        if target_user_id and len(rows) > 0:
+            user_n = rf(rows[0], 'name') or target_user_id
+            fname = f"Ponto - {user_n}.xlsx"
+            
+        return send_file(out, download_name=fname, as_attachment=True)
     except Exception as e:
+        print(f"Excel Error: {e}")
         return jsonify({'message': str(e)}), 500
     finally:
         try: conn.close()
@@ -1536,11 +2032,14 @@ def perform_sync_for_user(user_matricula):
                         can_delete = True
                     else:
                         try:
+                            # Read is_retroactive and justification safely using rf
+                            q_is_retro = rf(qr, 'is_retroactive') or 0
+                            q_justif = rf(qr, 'justification')
                             lcur.execute("""
-                                INSERT INTO TimeRecords (user_id, matricula, user_name, record_type, timestamp, neighborhood, city, latitude, longitude, accuracy, full_address, transaction_id)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                INSERT INTO TimeRecords (user_id, matricula, user_name, record_type, timestamp, neighborhood, city, latitude, longitude, accuracy, full_address, transaction_id, is_retroactive, justification)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             """, (rf(qr,'user_id'), rf(qr,'matricula'), rf(qr,'user_name'), rf(qr,'record_type'), rf(qr,'timestamp'), 
-                                  rf(qr,'neighborhood'), rf(qr,'city'), rf(qr,'latitude'), rf(qr,'longitude'), rf(qr,'accuracy'), rf(qr,'full_address'), tx_id))
+                                  rf(qr,'neighborhood'), rf(qr,'city'), rf(qr,'latitude'), rf(qr,'longitude'), rf(qr,'accuracy'), rf(qr,'full_address'), tx_id, q_is_retro, q_justif))
                             can_delete = True
                         except Exception as ins_err:
                             errs.append(f"Local Insert failed for {tx_id}: {ins_err}")
@@ -1568,7 +2067,8 @@ def perform_sync_for_user(user_matricula):
                         ("latitude", "FLOAT"), ("longitude", "FLOAT"), ("accuracy", "FLOAT"), 
                         ("full_address", "NVARCHAR(MAX)"), ("transaction_id", "NVARCHAR(100)"),
                         ("matricula", "NVARCHAR(50)"), ("user_name", "NVARCHAR(200)"),
-                        ("neighborhood", "NVARCHAR(200)"), ("city", "NVARCHAR(200)")
+                        ("neighborhood", "NVARCHAR(200)"), ("city", "NVARCHAR(200)"),
+                        ("is_retroactive", "INT"), ("justification", "NVARCHAR(MAX)")
                     ]:
                         try: 
                             rcur.execute(f"ALTER TABLE TimeRecords ADD {col} {col_type}")
@@ -1676,12 +2176,14 @@ def perform_sync_for_user(user_matricula):
                     
                     if (rf(mr, 'record_type'), cmp_ts) not in existing_sigs and (not tx_id_str or tx_id_str not in existing_sigs):
                         try:
+                            m_is_retro = rf(mr, 'is_retroactive') or 0
+                            m_justif = rf(mr, 'justification')
                             rcur.execute(f"""
-                                INSERT INTO TimeRecords (user_id, matricula, user_name, record_type, timestamp, neighborhood, city, latitude, longitude, accuracy, full_address, transaction_id)
-                                VALUES ({sph}, {sph}, {sph}, {sph}, {sph}, {sph}, {sph}, {sph}, {sph}, {sph}, {sph}, {sph})
+                                INSERT INTO TimeRecords (user_id, matricula, user_name, record_type, timestamp, neighborhood, city, latitude, longitude, accuracy, full_address, transaction_id, is_retroactive, justification)
+                                VALUES ({sph}, {sph}, {sph}, {sph}, {sph}, {sph}, {sph}, {sph}, {sph}, {sph}, {sph}, {sph}, {sph}, {sph})
                             """, (sql_user_id, str(user_matricula), user_name, rf(mr, 'record_type'), ts_dt,
                                   rf(mr, 'neighborhood'), rf(mr, 'city'), rf(mr, 'latitude'), rf(mr, 'longitude'), 
-                                  rf(mr, 'accuracy'), rf(mr, 'full_address'), tx_id))
+                                  rf(mr, 'accuracy'), rf(mr, 'full_address'), tx_id, m_is_retro, m_justif))
                             migrated += 1
                             print(f"DEBUG: Successfully synced record {tx_id} for {user_matricula}")
                         except Exception as e:

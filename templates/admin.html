@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Admin - SRE CARAPINA</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error-container": "#93000a",
+                        "surface-tint": "#136299",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary": "#894b62",
+                        "tertiary-fixed": "#ffdcbc",
+                        "secondary-fixed": "#ffd9e3",
+                        "primary-fixed": "#cfe5ff",
+                        "secondary-container": "#ffb0cb",
+                        "tertiary": "#7d4b00",
+                        "on-error": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "primary-fixed-dim": "#98cbff",
+                        "on-secondary-container": "#7b3f56",
+                        "primary-container": "#2d73aa",
+                        "secondary-fixed-dim": "#ffb0cb",
+                        "surface-container-highest": "#e1e3e4",
+                        "surface-bright": "#f8f9fa",
+                        "on-tertiary-container": "#fff0e4",
+                        "on-surface": "#191c1d",
+                        "on-secondary": "#ffffff",
+                        "surface-variant": "#e1e3e4",
+                        "inverse-on-surface": "#f0f1f2",
+                        "tertiary-container": "#9f6000",
+                        "outline-variant": "#c2c6d2",
+                        "on-tertiary": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed": "#38081f",
+                        "surface-dim": "#d9dadb",
+                        "primary": "#005a8f",
+                        "surface-container-low": "#f3f4f5",
+                        "surface-container-high": "#e7e8e9",
+                        "inverse-surface": "#2e3132",
+                        "outline": "#727782",
+                        "surface": "#f8f9fa",
+                        "inverse-primary": "#98cbff",
+                        "surface-container": "#edeeef",
+                        "on-primary-fixed": "#001d33",
+                        "on-secondary-fixed-variant": "#6d344a",
+                        "on-primary-fixed-variant": "#004a77",
+                        "tertiary-fixed-dim": "#ffb86a",
+                        "on-tertiary-fixed": "#2c1700",
+                        "on-background": "#191c1d",
+                        "on-surface-variant": "#424751",
+                        "background": "#f8f9fa",
+                        "on-primary-container": "#ebf3ff",
+                        "error": "#ba1a1a",
+                        "on-tertiary-fixed-variant": "#683d00"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body {
+            background: radial-gradient(circle at 0% 0%, #cfe5ff 0%, transparent 40%),
+                        radial-gradient(circle at 100% 100%, #ffd9e3 0%, transparent 40%),
+                        #f8f9fa;
+            min-height: 100vh;
+            font-family: 'Inter', sans-serif;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c2c6d2;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="text-on-surface">
+<!-- Side Navigation Shell -->
+<aside class="h-screen w-64 fixed left-0 top-0 bg-white/40 backdrop-blur-md flex flex-col p-4 gap-2 z-40 hidden md:flex border-r border-outline-variant/10">
+<div class="mb-8 px-4 py-6">
+<img alt="Governo ES Crest" class="h-16 w-auto mx-auto mb-4 drop-shadow-sm" src="https://cdn.es.gov.br/images/logo/governo/brasao/center/Brasao_Governo_500.png"/>
+<h1 class="text-lg font-black text-slate-900 text-center leading-tight">Governo ES</h1>
+<p class="text-xs text-on-surface-variant text-center opacity-70">Time Management</p>
+</div>
+<nav class="flex flex-col gap-2">
+<a class="flex items-center gap-3 bg-white text-blue-700 rounded-xl px-4 py-3 shadow-sm hover:translate-x-1 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="settings_applications">settings_applications</span>
+<span class="text-sm font-medium">System</span>
+</a>
+</nav>
+<div class="mt-auto p-4">
+<button onclick="logout()" class="w-full py-3 px-4 bg-gradient-to-r from-red-600 to-red-400 text-white flex items-center justify-center gap-2 rounded-xl font-bold shadow-lg shadow-red-500/20 active:scale-95 transition-all text-sm">
+                <span class="material-symbols-outlined text-[18px]">logout</span> Sair
+            </button>
+</div>
+</aside>
+<!-- Top AppBar Shell -->
+<header class="fixed top-0 w-full z-50 md:pl-64">
+<div class="flex flex-col items-center justify-center pt-8 pb-4 w-full bg-transparent pointer-events-none">
+<img alt="Official Crest of Espírito Santo" class="h-14 md:h-16 w-auto mb-4 drop-shadow-md" src="https://cdn.es.gov.br/images/logo/governo/brasao/center/Brasao_Governo_500.png"/>
+<span class="text-xl font-black bg-gradient-to-r from-blue-700 to-pink-500 bg-clip-text text-transparent uppercase tracking-wider">Admin - SRE CARAPINA</span>
+</div>
+<div class="absolute right-8 top-12 flex items-center gap-6">
+    <div class="flex items-center gap-4">
+        <span class="hidden lg:block text-sm font-bold text-on-surface" id="adminName">Admin</span>
+        <button class="md:hidden text-error hover:bg-error/10 p-2 rounded-full" onclick="logout()" title="Sair"><span class="material-symbols-outlined">logout</span></button>
+    </div>
+</div>
+</header>
+
+<!-- Main Content Canvas -->
+<main class="pt-48 pb-12 md:pl-64 px-6 min-h-screen">
+<div class="max-w-7xl mx-auto space-y-8">
+
+<!-- Section 1: Gestão Administrativa - Ponto Retroativo -->
+<section class="space-y-4">
+<div class="flex items-center justify-between px-2">
+<h2 class="text-2xl font-bold tracking-tight text-on-surface flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="history_toggle_off">history_toggle_off</span>
+                        Gestão Administrativa - Ponto Retroativo
+                    </h2>
+<span class="px-4 py-1.5 bg-secondary-fixed text-on-secondary-fixed rounded-full text-xs font-bold uppercase tracking-wider">Review Required</span>
+</div>
+<div class="glass-panel rounded-xl shadow-sm overflow-hidden border border-outline-variant/10">
+<!-- Container to hold everything -->
+<div id="retroContainer" class="overflow-x-auto min-h-[200px]">
+    <!-- JS Will render the table here -->
+    <table class="w-full text-left border-collapse" id="retroTable">
+    <thead class="bg-surface-container-low border-b border-outline-variant/20">
+    <tr>
+    <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Colaborador</th>
+    <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Data/Hora</th>
+    <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Tipo</th>
+    <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Justificativa</th>
+    <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Anexo</th>
+    <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider text-right">Ações</th>
+    </tr>
+    </thead>
+    <tbody class="divide-y divide-outline-variant/10">
+    </tbody>
+    </table>
+</div>
+</div>
+</section>
+
+<!-- Bento Grid: Reports & Configuration -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- Section 2: Gerar Relatórios -->
+<section class="lg:col-span-2 glass-panel p-8 rounded-xl shadow-sm border border-outline-variant/10 space-y-6">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-2xl" data-icon="analytics">analytics</span>
+<h2 class="text-xl font-bold text-on-surface">Gerar Relatórios</h2>
+</div>
+<div class="space-y-6">
+<div class="grid grid-cols-1 md:grid-cols-1 gap-4">
+<div class="space-y-2">
+<label class="text-sm font-bold text-on-surface-variant">Colaborador</label>
+<select id="userSelect" class="w-full bg-white/50 border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary/20 appearance-none">
+<option value="">Todos (Geral)</option>
+</select>
+</div>
+</div>
+<div class="flex flex-wrap gap-3 pt-4">
+<button onclick="generateReport()" class="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-white/80 text-on-surface font-semibold rounded-xl hover:bg-white shadow-sm transition-all active:scale-95">
+<span class="material-symbols-outlined text-green-700" data-icon="table_chart">table_chart</span> Baixar Excel
+</button>
+<button onclick="downloadAdminEDocsReport()" class="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-white/80 text-on-surface font-semibold rounded-xl hover:bg-white shadow-sm transition-all active:scale-95">
+<span class="material-symbols-outlined text-red-700" data-icon="picture_as_pdf">picture_as_pdf</span> Baixar E-Docs
+</button>
+<button onclick="downloadAdminSiahresReport()" class="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-white/80 text-on-surface font-semibold rounded-xl hover:bg-white shadow-sm transition-all active:scale-95">
+<span class="material-symbols-outlined text-blue-700" data-icon="description">description</span> Baixar Siahres
+</button>
+</div>
+</div>
+</section>
+
+<!-- Section 3: Configurações do Sistema -->
+<section class="glass-panel p-8 rounded-xl shadow-sm border border-outline-variant/10 space-y-6 flex flex-col justify-between">
+<div>
+<div class="flex items-center gap-3 mb-6">
+<span class="material-symbols-outlined text-primary text-2xl" data-icon="lock_reset">lock_reset</span>
+<h2 class="text-xl font-bold text-on-surface">Segurança</h2>
+</div>
+<div class="space-y-4">
+<div class="space-y-2">
+<label class="text-sm font-bold text-on-surface-variant">Senha de Edição de Localização</label>
+<div class="relative">
+<input id="locationPasswordInput" class="w-full bg-white/50 border border-outline-variant/30 rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary/20" placeholder="••••••••" type="text"/>
+</div>
+<p class="text-[10px] text-on-surface-variant">Esta senha será solicitada aos usuários que desejarem editar o bairro/cidade no dashboard antes de registrar ponto.</p>
+</div>
+</div>
+</div>
+<button onclick="updateConfig()" class="w-full py-4 bg-primary text-on-primary font-bold rounded-xl shadow-lg shadow-primary/10 hover:brightness-110 active:scale-95 transition-all">
+                        Salvar Senha
+                    </button>
+</section>
+</div>
+
+<!-- Section 4: Gestão de Usuários -->
+<section class="grid grid-cols-1 xl:grid-cols-4 gap-8">
+<!-- User Creation Form -->
+<div class="xl:col-span-1 glass-panel p-6 rounded-xl shadow-sm border border-outline-variant/10 space-y-6">
+<h3 class="text-lg font-bold text-on-surface">Novo Usuário</h3>
+<form class="space-y-4" onsubmit="createUser(); return false;">
+<div class="space-y-1">
+<label class="text-xs font-bold text-on-surface-variant">Matrícula</label>
+<input id="newMatricula" class="w-full bg-white/50 border-none rounded-lg p-2.5 text-sm" placeholder="0000000-0" type="text" required/>
+</div>
+<div class="space-y-1">
+<label class="text-xs font-bold text-on-surface-variant">Nome</label>
+<input id="newName" class="w-full bg-white/50 border-none rounded-lg p-2.5 text-sm" placeholder="Nome Completo" type="text" required/>
+</div>
+<div class="space-y-1">
+<label class="text-xs font-bold text-on-surface-variant">Senha</label>
+<input id="newPassword" class="w-full bg-white/50 border-none rounded-lg p-2.5 text-sm" placeholder="***" type="password" required/>
+</div>
+<div class="space-y-1">
+<label class="text-xs font-bold text-on-surface-variant">Cargo / Ocupação</label>
+<input id="newCargo" class="w-full bg-white/50 border-none rounded-lg p-2.5 text-sm" placeholder="Ex: Professor" type="text"/>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div class="space-y-1">
+<label class="text-xs font-bold text-on-surface-variant">Carga</label>
+<select id="newWorkload" class="w-full bg-white/50 border-none rounded-lg p-2.5 text-sm appearance-none">
+<option value="30h">30h</option>
+<option value="40h" selected>40h</option>
+<option value="50h">50h</option>
+</select>
+</div>
+<div class="space-y-1">
+<label class="text-xs font-bold text-on-surface-variant">Perfil</label>
+<select id="newRole" class="w-full bg-white/50 border-none rounded-lg p-2.5 text-sm appearance-none">
+<option value="user">Usuário Padrão</option>
+<option value="admin">Administrador</option>
+</select>
+</div>
+</div>
+<button class="w-full py-3 bg-secondary-container text-on-secondary-container font-bold rounded-xl hover:brightness-95 active:scale-95 transition-all" type="submit">
+                            Criar Usuário
+                        </button>
+</form>
+</div>
+
+<!-- Existing Users List -->
+<div class="xl:col-span-3 glass-panel rounded-xl shadow-sm border border-outline-variant/10 overflow-hidden">
+<div class="p-6 border-b border-outline-variant/10 flex justify-between items-center bg-white/40">
+<h3 class="text-lg font-bold text-on-surface">Usuários Ativos</h3>
+<button id="bulkDeleteBtn" onclick="deleteSelectedUsers()" disabled class="text-xs font-bold text-error px-4 py-2 hover:bg-error/10 border border-error/50 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Excluir Selecionados</button>
+</div>
+<div class="overflow-x-auto max-h-[500px] custom-scrollbar">
+<table class="w-full text-left" id="usersTable">
+<thead class="sticky top-0 bg-white/60 backdrop-blur-sm z-10 border-b border-outline-variant/20">
+<tr>
+<th class="px-3 py-3"><input type="checkbox" id="selectAllUsers" class="w-4 h-4 text-primary bg-white/50 border-outline-variant/30 rounded focus:ring-primary/20"></th>
+<th class="px-6 py-3 text-[10px] font-black text-on-surface-variant uppercase tracking-widest">Matrícula</th>
+<th class="px-6 py-3 text-[10px] font-black text-on-surface-variant uppercase tracking-widest">Colaborador</th>
+<th class="px-6 py-3 text-[10px] font-black text-on-surface-variant uppercase tracking-widest text-right">Ações</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/10">
+    <!-- JS -->
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</div>
+</main>
+
+<!-- Edit User Modal (Tailwind) -->
+<div id="editUserModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+        <div class="bg-surface-container text-on-surface px-6 py-4 flex justify-between items-center border-b border-outline-variant/20">
+            <h5 class="font-bold text-lg">Editar Usuário</h5>
+            <button onclick="closeEditModal()" class="w-8 h-8 rounded-full hover:bg-surface-container-high transition-colors flex justify-center items-center">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <div class="p-6 overflow-y-auto space-y-4">
+            <input type="hidden" id="editUserId">
+            <div class="space-y-1">
+                <label class="text-xs font-bold text-on-surface-variant">Matrícula</label>
+                <input type="text" id="editMatricula" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary/20">
+            </div>
+            <div class="space-y-1">
+                <label class="text-xs font-bold text-on-surface-variant">Nome</label>
+                <input type="text" id="editName" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary/20">
+            </div>
+            <div class="space-y-1">
+                <label class="text-xs font-bold text-on-surface-variant">Cargo</label>
+                <input type="text" id="editCargo" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary/20">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-on-surface-variant">Carga Horária</label>
+                    <select id="editWorkload" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary/20">
+                        <option value="30h">30h</option>
+                        <option value="40h">40h</option>
+                        <option value="50h">50h</option>
+                    </select>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-on-surface-variant">Perfil</label>
+                    <select id="editRole" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary/20">
+                        <option value="user">Usuário</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+            </div>
+            <div class="space-y-1">
+                <label class="text-xs font-bold text-on-surface-variant">Nova Senha <span class="text-[10px] text-outline">(opcional, deixe em branco para não alterar)</span></label>
+                <input type="password" id="editPassword" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary/20">
+            </div>
+        </div>
+        <div class="pt-4 px-6 pb-6 bg-surface-bright border-t border-outline-variant/20 flex justify-end gap-3">
+            <button type="button" onclick="closeEditModal()" class="px-5 py-2.5 rounded-full font-bold text-sm bg-surface-container-high hover:bg-surface-container-highest transition-colors">Cancelar</button>
+            <button type="button" onclick="saveUserEdit()" class="px-5 py-2.5 rounded-full font-bold text-sm bg-primary text-white hover:shadow-lg hover:-translate-y-0.5 transition-all">Salvar Alterações</button>
+        </div>
+    </div>
+</div>
+
+<script src="config.js?v=6.8"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('ponto_token');
+            const role = localStorage.getItem('user_role');
+            if (!token || role !== 'admin') {
+                window.location.href = 'index.html';
+                return;
+            }
+            document.getElementById('adminName').innerText = localStorage.getItem('user_name');
+            loadData();
+        });
+
+        async function loadData() {
+            const token = localStorage.getItem('ponto_token');
+            try {
+                if (window.API_READY) await window.API_READY;
+                const response = await apiFetch(`/api/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const users = await response.json();
+                window.allUsers = users;
+                const select = document.getElementById('userSelect');
+                users.forEach(user => {
+                    const option = document.createElement('option');
+                    option.value = user.id;
+                    option.innerText = `${user.name} (${user.matricula})`;
+                    select.appendChild(option);
+                });
+                await loadUsersTable();
+                await loadConfig();
+                await loadRetroactivePunches();
+                initSelectionLogic();
+            } catch (error) {
+                console.error("Erro ao carregar usuários", error);
+            }
+        }
+
+        function initSelectionLogic() {
+            const selectAll = document.getElementById('selectAllUsers');
+            if (selectAll) {
+                selectAll.checked = false;
+                selectAll.addEventListener('change', () => {
+                    const checkboxes = document.querySelectorAll('.user-checkbox');
+                    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+                    updateBulkDeleteBtn();
+                });
+            }
+            updateBulkDeleteBtn();
+        }
+
+        function updateBulkDeleteBtn() {
+            const selectedCount = document.querySelectorAll('.user-checkbox:checked').length;
+            const btn = document.getElementById('bulkDeleteBtn');
+            if (btn) {
+                btn.disabled = selectedCount === 0;
+                btn.innerText = selectedCount > 0 ? `Excluir Selecionados (${selectedCount})` : 'Excluir Selecionados';
+            }
+        }
+
+        async function deleteSelectedUsers() {
+            const checkboxes = document.querySelectorAll('.user-checkbox:checked');
+            const ids = Array.from(checkboxes).map(cb => cb.getAttribute('data-id'));
+
+            if (ids.length === 0) return;
+
+            if (!confirm(`Deseja realmente excluir ${ids.length} usuários selecionados? Esta ação também excluirá todos os registros de ponto desses usuários.`)) {
+                return;
+            }
+
+            const token = localStorage.getItem('ponto_token');
+            try {
+                if (window.API_READY) await window.API_READY;
+                const res = await apiFetch(`/api/admin/users/bulk-delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ user_ids: ids })
+                });
+
+                if (res.ok) {
+                    alert('Usuários excluídos com sucesso!');
+                    document.getElementById('userSelect').innerHTML = '<option value="">Todos (Geral)</option>';
+                    await loadData();
+                } else {
+                    const data = await res.json().catch(() => ({ message: 'Erro ao excluir usuários' }));
+                    alert(data.message || 'Erro ao excluir usuários');
+                }
+            } catch (error) {
+                alert('Erro de conexão ao excluir usuários.');
+            }
+        }
+
+        async function generateReport() {
+            const token = localStorage.getItem('ponto_token');
+            const userId = document.getElementById('userSelect').value;
+            
+            let userName = "Geral";
+            if (userId && window.allUsers) {
+                const user = window.allUsers.find(u => u.id == userId);
+                if (user) userName = user.name;
+            }
+            
+            try {
+                if (window.API_READY) await window.API_READY;
+                let path = `/api/admin/report`;
+                if (userId) path += `?user_id=${userId}`;
+                const response = await apiFetch(path, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = userId ? `Ponto - ${userName}.xlsx` : 'Relatorio_Geral.xlsx';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                } else {
+                    alert("Erro ao gerar relatório.");
+                }
+            } catch (error) {
+                alert("Erro de conexão.");
+            }
+        }
+
+        async function loadUsersTable() {
+            const token = localStorage.getItem('ponto_token');
+            try {
+                if (window.API_READY) await window.API_READY;
+                const response = await apiFetch(`/api/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const users = await response.json();
+                window.allUsers = users;
+                const tbody = document.querySelector('#usersTable tbody');
+                tbody.innerHTML = '';
+                users.forEach(u => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-white/40 transition-colors";
+                    tr.innerHTML = `
+                        <td class="px-3 py-4"><input type="checkbox" class="user-checkbox w-4 h-4 text-primary bg-white/50 border-outline-variant/30 rounded focus:ring-primary/20" data-id="${u.id}"></td>
+                        <td class="px-6 py-4 text-sm font-mono">${u.matricula}</td>
+                        <td class="px-6 py-4">
+                            <div class="flex flex-col">
+                                <span class="text-sm font-bold">${u.name}</span>
+                                <span class="text-[10px] text-on-surface-variant">${u.workload || '40h'} | ${u.role === 'admin' ? 'Administrador' : 'Usuário'}</span>
+                                <span class="text-[10px] text-on-surface-variant">${u.cargo || ''}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-right flex justify-end gap-1">
+                            <button class="p-2 text-on-surface-variant hover:bg-white/60 rounded-lg" onclick="openEditModal(${u.id})" title="Editar"><span class="material-symbols-outlined text-lg" data-icon="edit">edit</span></button>
+                            <button class="p-2 text-orange-500 hover:bg-orange-100 rounded-lg" onclick="clearUserRecords('${u.matricula}')" title="Limpar Registros"><span class="material-symbols-outlined text-lg" data-icon="mop">mop</span></button>
+                            <button class="p-2 text-error hover:bg-error-container/30 rounded-lg" onclick="deleteUser(${u.id})" title="Excluir"><span class="material-symbols-outlined text-lg" data-icon="delete">delete</span></button>
+                        </td>
+                    `;
+                    tr.querySelector('.user-checkbox').addEventListener('change', updateBulkDeleteBtn);
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                alert('Erro ao carregar usuários');
+            }
+        }
+
+        function openEditModal(id) {
+            const user = window.allUsers.find(u => u.id === id);
+            if (!user) return;
+            document.getElementById('editUserId').value = user.id;
+            document.getElementById('editMatricula').value = user.matricula;
+            document.getElementById('editName').value = user.name;
+            document.getElementById('editCargo').value = user.cargo || '';
+            document.getElementById('editWorkload').value = user.workload || '40h';
+            document.getElementById('editRole').value = user.role;
+            document.getElementById('editPassword').value = '';
+
+            document.getElementById('editUserModal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editUserModal').classList.add('hidden');
+        }
+
+        async function saveUserEdit() {
+            const id = document.getElementById('editUserId').value;
+            const payload = {
+                matricula: document.getElementById('editMatricula').value.trim(),
+                name: document.getElementById('editName').value.trim(),
+                cargo: document.getElementById('editCargo').value.trim(),
+                workload: document.getElementById('editWorkload').value,
+                role: document.getElementById('editRole').value
+            };
+            const pwd = document.getElementById('editPassword').value.trim();
+            if (pwd) payload.password = pwd;
+
+            const token = localStorage.getItem('ponto_token');
+            if (window.API_READY) await window.API_READY;
+            const res = await apiFetch(`/api/admin/users/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                closeEditModal();
+                document.getElementById('userSelect').innerHTML = '<option value="">Todos (Geral)</option>';
+                await loadData();
+            } else {
+                const data = await res.json().catch(() => ({ message: 'Erro' }));
+                alert(data.message || 'Erro ao atualizar');
+            }
+        }
+
+        async function deleteUser(id) {
+            if (!confirm('Deseja realmente excluir este usuário e todos os seus registros?')) return;
+            const token = localStorage.getItem('ponto_token');
+            if (window.API_READY) await window.API_READY;
+            const res = await apiFetch(`/api/admin/users/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                document.getElementById('userSelect').innerHTML = '<option value="">Todos (Geral)</option>';
+                await loadData();
+            } else {
+                const data = await res.json().catch(() => ({ message: 'Erro' }));
+                alert(data.message || 'Erro ao excluir');
+            }
+        }
+
+        async function clearUserRecords(matricula) {
+            if (!confirm(`Deseja realmente LIMPAR todos os registros da matrícula ${matricula}? Esta ação é irreversível e apagará o histórico no celular do usuário também.`)) {
+                return;
+            }
+
+            const token = localStorage.getItem('ponto_token');
+            try {
+                if (window.API_READY) await window.API_READY;
+                const res = await apiFetch(`/api/admin/clear_records`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ matricula: matricula })
+                });
+
+                if (res.ok) {
+                    alert('Registros limpos com sucesso!');
+                    await loadUsersTable();
+                } else {
+                    const data = await res.json().catch(() => ({ message: 'Erro ao limpar registros' }));
+                    alert(data.message || 'Erro ao limpar registros');
+                }
+            } catch (error) {
+                alert('Erro de conexão ao limpar registros.');
+            }
+        }
+
+        async function loadConfig() {
+            const token = localStorage.getItem('ponto_token');
+            try {
+                if (window.API_READY) await window.API_READY;
+                const response = await apiFetch(`/api/admin/config`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const config = await response.json();
+                if (config.location_edit_password) {
+                    document.getElementById('locationPasswordInput').value = config.location_edit_password;
+                }
+            } catch (error) {
+                console.error("Erro ao carregar configurações", error);
+            }
+        }
+
+        async function updateConfig() {
+            const token = localStorage.getItem('ponto_token');
+            const newPassword = document.getElementById('locationPasswordInput').value.trim();
+            if (!newPassword) {
+                alert('A senha não pode ser vazia.');
+                return;
+            }
+            try {
+                if (window.API_READY) await window.API_READY;
+                const res = await apiFetch(`/api/admin/config`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ location_edit_password: newPassword })
+                });
+                if (res.ok) {
+                    alert('Configuração atualizada com sucesso!');
+                } else {
+                    const data = await res.json().catch(() => ({ message: 'Erro' }));
+                    alert(data.message || 'Erro ao atualizar configuração');
+                }
+            } catch (error) {
+                alert('Erro de conexão ao atualizar configuração.');
+            }
+        }
+
+        async function createUser() {
+            const token = localStorage.getItem('ponto_token');
+            const matricula = document.getElementById('newMatricula').value.trim();
+            const name = document.getElementById('newName').value.trim();
+            const cargo = document.getElementById('newCargo').value.trim();
+            const password = document.getElementById('newPassword').value.trim();
+            const role = document.getElementById('newRole').value;
+            const workload = document.getElementById('newWorkload').value;
+            if (!matricula || !name || !password) { alert('Preencha matrícula, nome e senha'); return; }
+            if (window.API_READY) await window.API_READY;
+            const res = await apiFetch(`/api/admin/users`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ matricula, name, password, role, cargo, workload })
+            });
+            if (res.ok) {
+                document.getElementById('newMatricula').value = '';
+                document.getElementById('newName').value = '';
+                document.getElementById('newCargo').value = '';
+                document.getElementById('newPassword').value = '';
+                document.getElementById('newRole').value = 'user';
+                document.getElementById('newWorkload').value = '40h';
+                document.getElementById('userSelect').innerHTML = '<option value=\"\">Todos (Geral)</option>';
+                await loadData();
+            } else {
+                const data = await res.json().catch(() => ({ message: 'Erro' }));
+                alert(data.message || 'Erro ao criar');
+            }
+        }
+
+        function initApiUi() {
+            // Removido
+        }
+
+        async function loadRetroactivePunches() {
+            const token = localStorage.getItem('ponto_token');
+            try {
+                const res = await apiFetch('/api/admin/retroactive', { headers: { 'Authorization': `Bearer ${token}` } });
+                const records = await res.json();
+                const container = document.getElementById('retroContainer');
+                const tbody = document.querySelector('#retroTable tbody');
+                
+                if (records.length === 0) {
+                    if (container) container.innerHTML = `<div class='p-12 flex flex-col items-center justify-center text-center space-y-4'><div class='w-16 h-16 bg-white/50 rounded-full flex items-center justify-center'><span class='material-symbols-outlined text-outline text-3xl' data-icon='inbox'>inbox</span></div><div class='max-w-xs'><p class='text-on-surface font-semibold'>Sem solicitações pendentes</p><p class='text-sm text-on-surface-variant'>Não há pedidos de ponto retroativo para análise no momento.</p></div></div>`;
+                    return;
+                }
+                
+                // Ensure table exists (if it was replaced by alert)
+                if (!document.getElementById('retroTable')) {
+                    container.innerHTML = `
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle" id="retroTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Colaborador</th>
+                                        <th>Data/Hora</th>
+                                        <th>Tipo</th>
+                                        <th>Justificativa</th>
+                                        <th>Anexo</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>`;
+                }
+                const newTbody = document.querySelector('#retroTable tbody');
+                if (newTbody) newTbody.innerHTML = '';
+
+                // card.style.display = 'block'; (Already visible)
+                records.forEach(r => {
+                    const tr = document.createElement('tr');
+                    const hasDoc = r.document_path ? `<a href="/${r.document_path}" target="_blank" class="btn btn-sm btn-outline-info">📄 Ver</a>` : '<span class="text-muted">Sem anexo</span>';
+                    
+                    tr.className = "hover:bg-white/40 transition-colors";
+                    const hasAttachment = r.document_path ? `<a href="/${r.document_path}" target="_blank" class="p-1 px-3 text-xs bg-blue-100 text-blue-700 font-bold rounded-full hover:bg-blue-200">Ver Anexo</a>` : '<span class="text-xs text-outline italic">Sem anexo</span>';
+                    tr.innerHTML = `
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-primary font-bold text-xs">${r.user_name.substring(0,2).toUpperCase()}</div>
+                                <div class="flex flex-col">
+                                    <span class="text-sm font-medium">${r.user_name}</span>
+                                    <span class="text-xs text-on-surface-variant font-mono">${r.matricula}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-sm">${r.timestamp}</td>
+                        <td class="px-6 py-4"><span class="px-3 py-1 bg-primary-fixed text-on-primary-fixed-variant rounded-full text-xs font-medium">${r.type}</span></td>
+                        <td class="px-6 py-4 text-xs text-on-surface-variant max-w-xs truncate">${r.justification || '-'}</td>
+                        <td class="px-6 py-4">${hasAttachment}</td>
+                        <td class="px-6 py-4 text-right space-x-2 whitespace-nowrap">
+                            <button class="p-2 text-green-600 hover:bg-green-50 rounded-lg" onclick="approveRetro('${r.transaction_id}')" title="Aprovar"><span class="material-symbols-outlined" data-icon="check_circle">check_circle</span></button>
+                            <button class="p-2 text-error hover:bg-error-container rounded-lg" onclick="deleteRetro('${r.transaction_id}')" title="Excluir"><span class="material-symbols-outlined" data-icon="delete">delete</span></button>
+                        </td>
+                    `;
+                    if (newTbody) newTbody.appendChild(tr);
+                });
+            } catch (e) { console.error("Erro retroativo:", e); }
+        }
+
+        async function approveRetro(txId) {
+            if(!confirm("Aprovar este ponto retroativo? Ele deixará de aparecer nesta lista mas continuará nos relatórios.")) return;
+            const token = localStorage.getItem('ponto_token');
+            try {
+                const res = await apiFetch(`/api/admin/record/${txId}/approve`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) await loadRetroactivePunches();
+            } catch (e) { alert("Erro ao aprovar"); }
+        }
+
+        async function deleteRetro(txId) {
+            if(!confirm("REJEITAR e EXCLUIR permanentemente este registro? O usuário não verá mais este ponto.")) return;
+            const token = localStorage.getItem('ponto_token');
+            try {
+                const res = await apiFetch(`/api/admin/record/${txId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) await loadRetroactivePunches();
+            } catch (e) { alert("Erro ao excluir"); }
+        }
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        }
+
+        async function downloadAdminSiahresReport() {
+            const userId = document.getElementById('userSelect').value;
+            if (!userId) {
+                alert("Por favor, selecione um colaborador para gerar o relatório PDF.");
+                return;
+            }
+
+            if (!window.jspdf) { alert("Biblioteca PDF carregando... Tente novamente em instantes."); return; }
+
+            document.body.style.cursor = 'wait';
+            const token = localStorage.getItem('ponto_token');
+
+            try {
+                // 1. Get User Details
+                let user = null;
+                if (window.allUsers) {
+                    user = window.allUsers.find(u => u.id == userId);
+                }
+
+                // Fallback fetch if not found
+                if (!user) {
+                    if (window.API_READY) await window.API_READY;
+                    const usersRes = await apiFetch(`/api/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } });
+                    const users = await usersRes.json();
+                    user = users.find(u => u.id == userId);
+                }
+
+                if (!user) { throw new Error("Usuário não encontrado."); }
+
+                const userName = user.name;
+                const matricula = user.matricula;
+                const userCargo = user.cargo || "Funcionario";
+
+                // 2. Fetch Records (JSON format)
+                const reportRes = await apiFetch(`/api/admin/report?user_id=${userId}&format=json`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                let records = [];
+                if (reportRes.ok) {
+                    records = await reportRes.json();
+                } else {
+                    throw new Error("Erro ao buscar registros.");
+                }
+
+                // 3. Generate PDF (Parity with dashboard.html)
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ orientation: 'landscape', format: 'a4' });
+
+                // Logo (Brasao) - Load async
+                const logo = new Image();
+                logo.src = '/static/brasao.png'; // Absolute path for admin
+                try {
+                    await new Promise((resolve) => {
+                        if (logo.complete) return resolve();
+                        logo.onload = resolve;
+                        logo.onerror = resolve;
+                        setTimeout(resolve, 1000);
+                    });
+                    doc.addImage(logo, 'PNG', 10, 5, 15, 18);
+                } catch (e) {
+                    console.warn("Logo loading failed", e);
+                }
+
+                // Use current date for "Month/Year" since Admin doesn't select a range
+                let reportDate = new Date();
+                // Optionally if records exist, we could use the month of the latest record?
+                // But dashboard generally defaults to "Now". Let's stick to "Now".
+
+                const monthNames = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
+                const monthStr = monthNames[reportDate.getMonth()];
+                const yearStr = reportDate.getFullYear();
+
+                const justifications = []; // To store retroactive justifications
+
+                const centerX = 297 / 2;
+
+                // Compact Header
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "bold");
+                const center = (txt, y) => doc.text(txt, centerX, y, { align: "center" });
+
+                center("GOVERNO DO ESTADO DO ESPÍRITO SANTO", 8);
+                center("SECRETARIA DE ESTADO DA EDUCAÇÃO", 12);
+                center("SRE CARAPINA", 16);
+
+                doc.setFontSize(11);
+                center("Apuração Diária de Frequência", 22);
+
+                doc.setFontSize(8);
+                doc.text("SIARHES", 285, 8, { align: "right" });
+
+                // Info Line (Compact)
+                const yInfo = 28;
+                doc.setFontSize(9);
+                const col1 = 15, col2 = 100, col3 = 160, col4 = 220;
+
+                doc.text(`Servidor(a): ${userName}`, col1, yInfo);
+                doc.text(`Matrícula: ${matricula}`, col2, yInfo);
+                doc.text(`Mês/Ano: ${monthStr} / ${yearStr}`, col3, yInfo);
+                doc.text(`Cargo: ${userCargo}`, col4, yInfo);
+
+                // Prepare Data Table
+                const dStart = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1);
+                const dEnd = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0);
+                const fmt = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+                const reportData = [];
+
+                for (let d = new Date(dStart); d <= dEnd; d.setDate(d.getDate() + 1)) {
+                    const dayStr = fmt(d);
+                    const dayRecords = records.filter(r => r.timestamp.startsWith(dayStr));
+                    
+                    const stdPunches = dayRecords.filter(r => {
+                        const t = (r.type || "").toLowerCase();
+                        return !(t.includes('atestado') || t.includes('abono') || t.includes('compensação') || t.includes('compensacao') || t.includes('saldo') || t.includes('3º turno') || t.includes('extra'));
+                    });
+                    
+                    const groupedByType = {};
+                    stdPunches.forEach(r => {
+                        const t = r.type || "";
+                        if (!groupedByType[t]) groupedByType[t] = [];
+                        groupedByType[t].push(r);
+                    });
+                    
+                    const filteredPunchesList = [];
+                    for (const t in groupedByType) {
+                        const pts = groupedByType[t];
+                        const approvedRetros = pts.filter(p => p.is_retroactive && p.is_reviewed);
+                        if (approvedRetros.length > 0) {
+                            filteredPunchesList.push(approvedRetros[approvedRetros.length - 1]);
+                        } else {
+                            filteredPunchesList.push(...pts);
+                        }
+                    }
+                    
+                    const realPunches = filteredPunchesList.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+
+                    const formatTime = (match) => {
+                        if (!match) return "";
+                        let time = match.timestamp.split(' ')[1].substring(0, 5);
+                        if (match.is_retroactive) {
+                            time += "*";
+                            const existing = justifications.find(j => j.day === d.getDate());
+                            if (!existing) {
+                                justifications.push({ day: d.getDate(), text: match.justification || 'Ajuste Manual' });
+                            }
+                        }
+                        return time;
+                    };
+
+                    let e1 = "", s1 = "", e2 = "", s2 = "";
+                    realPunches.forEach(p => {
+                        let timeStr = formatTime(p);
+                        if (!timeStr) return;
+                        const t = (p.type || "").trim();
+                        if (t === "Entrada" && !e1) e1 = timeStr;
+                        else if ((t === "Saída Almoço" || t === "Saida Almoco") && !s1) s1 = timeStr;
+                        else if ((t === "Volta Almoço" || t === "Volta Almoco") && !e2) e2 = timeStr;
+                        else if ((t === "Saída" || t === "Saida") && !s2) s2 = timeStr;
+                        else {
+                            if (!e1) e1 = timeStr;
+                            else if (!s1) s1 = timeStr;
+                            else if (!e2) e2 = timeStr;
+                            else if (!s2) s2 = timeStr;
+                        }
+                    });
+
+                    let row = [
+                        d.getDate().toString(),
+                        e1, "", s1, "",
+                        e2, "", s2, ""
+                    ];
+
+                    const dayOfWeek = d.getDay();
+                    if ((dayOfWeek === 0 || dayOfWeek === 6) && realPunches.length === 0) {
+                        row = [d.getDate().toString(), dayOfWeek === 0 ? "DOMINGO" : "SÁBADO"];
+                    }
+                    reportData.push(row);
+                }
+
+                // AUTO-TABLE Compact Config (Exact copy from dashboard.html)
+                doc.autoTable({
+                    startY: 32,
+                    margin: { left: 10, right: 10, bottom: 15 },
+                    pageBreak: 'avoid',
+                    showHead: 'everyPage',
+
+                    head: [
+                        [
+                            { content: 'DIA', rowSpan: 2, styles: { valign: 'middle', halign: 'center' } },
+                            { content: 'HORÁRIO MANHÃ', colSpan: 4, styles: { halign: 'center', fillColor: [220, 220, 220] } },
+                            { content: 'HORÁRIO TARDE', colSpan: 4, styles: { halign: 'center', fillColor: [220, 220, 220] } }
+                        ],
+                        ['ENTRADA', 'ASSINATURA', 'SAÍDA', 'ASSINATURA', 'ENTRADA', 'ASSINATURA', 'SAÍDA', 'ASSINATURA'].map(t => ({ content: t, styles: { halign: 'center' } }))
+                    ],
+                    body: reportData,
+                    theme: 'grid',
+                    styles: {
+                        fontSize: 7,
+                        cellPadding: 0.5,
+                        lineColor: [0, 0, 0],
+                        lineWidth: 0.1,
+                        textColor: [0, 0, 0],
+                        minCellHeight: 3.5,
+                        valign: 'middle'
+                    },
+                    headStyles: {
+                        fillColor: [220, 220, 220],
+                        textColor: [0, 0, 0],
+                        fontStyle: 'bold',
+                        lineWidth: 0.1,
+                        minCellHeight: 4,
+                        fontSize: 7
+                    },
+                    columnStyles: {
+                        0: { cellWidth: 9, halign: 'center' },
+                        1: { cellWidth: 15, halign: 'center' },
+                        2: { cellWidth: 51, halign: 'center' },
+                        3: { cellWidth: 15, halign: 'center' },
+                        4: { cellWidth: 51, halign: 'center' },
+                        5: { cellWidth: 15, halign: 'center' },
+                        6: { cellWidth: 51, halign: 'center' },
+                        7: { cellWidth: 15, halign: 'center' },
+                        8: { cellWidth: 51, halign: 'center' }
+                    },
+                    didParseCell: function (data) {
+                        if (data.section === 'body' && data.column.index === 1 && data.row.raw.length === 2) {
+                            data.cell.colSpan = 8;
+                            data.cell.styles.halign = 'center';
+                            data.cell.styles.fillColor = [240, 240, 240];
+                        }
+                    }
+                });
+
+                // Signatures (Compact Layout)
+                let finalY = doc.lastAutoTable.finalY + 10;
+                if (finalY < 180) finalY = 180;
+                if (finalY > 195) finalY = 195;
+
+                doc.setLineWidth(0.1);
+                doc.setFontSize(8);
+                const line = (x1, x2, txt, y) => { doc.line(x1, y, x2, y); doc.text(txt, (x1 + x2) / 2, y + 3, { align: 'center' }); };
+
+                line(40, 110, "ASSINATURA DO SERVIDOR", finalY);
+                line(180, 250, "ASSINATURA DA CHEFIA IMEDIATA", finalY);
+
+                // Observations Section
+                if (justifications.length > 0) {
+                    let obsY = finalY + 15;
+                    if (obsY > 200) {
+                        doc.addPage();
+                        obsY = 20;
+                    }
+                    doc.setFontSize(8);
+                    doc.setFont("helvetica", "bold");
+                    doc.text("(*) OBSERVAÇÕES / JUSTIFICATIVAS:", 10, obsY);
+                    doc.setFont("helvetica", "normal");
+                    justifications.forEach((j, idx) => {
+                        doc.text(`- Dia ${j.day}: ${j.text}`, 10, obsY + 5 + (idx * 4));
+                    });
+                }
+
+                doc.save(`Frequencia_${monthStr}_${userName}.pdf`);
+
+            } catch (error) {
+                console.error(error);
+                alert("Erro ao gerar PDF: " + error.message);
+            } finally {
+                document.body.style.cursor = 'default';
+            }
+        }
+
+        async function downloadAdminEDocsReport() {
+            const userId = document.getElementById('userSelect').value;
+            if (!userId) {
+                alert("Por favor, selecione um colaborador para gerar o relatório do E-DOCS.");
+                return;
+            }
+
+            if (!window.jspdf) { alert("Biblioteca PDF carregando... Tente novamente em instantes."); return; }
+
+            document.body.style.cursor = 'wait';
+            const token = localStorage.getItem('ponto_token');
+
+            try {
+                // 1. Get User Details
+                let user = null;
+                if (window.allUsers) {
+                    user = window.allUsers.find(u => u.id == userId);
+                }
+
+                if (!user) {
+                    if (window.API_READY) await window.API_READY;
+                    const usersRes = await apiFetch(`/api/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } });
+                    const users = await usersRes.json();
+                    user = users.find(u => u.id == userId);
+                }
+
+                if (!user) { throw new Error("Usuário não encontrado."); }
+
+                const userName = user.name;
+                const matricula = user.matricula;
+                const userCargo = user.cargo || "AGENTE DE SUPORTE EDUCACIONAL";
+
+                // 2. Fetch Records
+                const reportRes = await apiFetch(`/api/admin/report?user_id=${userId}&format=json`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                let records = [];
+                if (reportRes.ok) {
+                    records = await reportRes.json();
+                } else {
+                    throw new Error("Erro ao buscar registros.");
+                }
+
+                // 3. Generate PDF
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ orientation: 'portrait', format: 'a4' });
+
+                const logo = new Image();
+                logo.src = '/static/brasao.png'; 
+                try {
+                    await new Promise((resolve) => {
+                        if (logo.complete) return resolve();
+                        logo.onload = resolve;
+                        logo.onerror = resolve;
+                        setTimeout(resolve, 1000);
+                    });
+                    doc.addImage(logo, 'PNG', 10, 5, 18, 22);
+                } catch (e) {
+                    console.warn("Logo loading failed", e);
+                }
+
+                let reportDate = new Date();
+                const monthStr = String(reportDate.getMonth() + 1).padStart(2, '0');
+                const yearStr = reportDate.getFullYear();
+
+                // Header Texts
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "bold");
+                doc.text("ESTADO DO ESPIRITO SANTO", 35, 12);
+                doc.text("ESPIRITO SANTO SECRETARIA DE ESTADO DA EDUCACAO - SEDU", 35, 17);
+                
+                // Container for Frequência
+                doc.setLineWidth(0.2);
+                doc.setDrawColor(150, 150, 150); 
+                doc.setFontSize(11);
+                doc.setFont("helvetica", "bold");
+                doc.text(`FREQUÊNCIA - ${monthStr}/${yearStr}`, 105, 30, { align: "center" });
+
+                doc.line(10, 33, 200, 33);
+                doc.setFontSize(10);
+                doc.text("DADOS PESSOAIS", 10, 37);
+                doc.line(10, 39, 200, 39);
+                
+                doc.setFont("helvetica", "bold");
+                doc.text(`Nome:`, 10, 44);
+                doc.setFont("helvetica", "normal");
+                doc.text(userName.toUpperCase(), 23, 44);
+                doc.setFont("helvetica", "bold");
+                doc.text(`Nº Funcional:`, 150, 44);
+                doc.setFont("helvetica", "normal");
+                doc.text(matricula, 175, 44);
+                
+                doc.line(10, 46, 200, 46);
+                
+                doc.setFont("helvetica", "bold");
+                doc.text(`Órgão/Setor:`, 10, 51);
+                doc.setFont("helvetica", "normal");
+                doc.text(`SEDU - SRECARAP`, 35, 51);
+                
+                doc.line(10, 53, 200, 53);
+                
+                doc.setFont("helvetica", "bold");
+                doc.text(`Cargo:`, 10, 58);
+                doc.setFont("helvetica", "normal");
+                doc.text(userCargo.toUpperCase(), 25, 58);
+                
+                doc.line(10, 60, 200, 60);
+
+                const dStart = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1);
+                const dEnd = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0);
+                const fmt = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+                const mmdd = (d) => String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+                const reportData = [];
+
+                const holidaysModel = {
+                    "01-01": "Feriado nacional - Confraternização Universal",
+                    "04-03": "Feriado nacional - Paixão de Cristo - Amparado pelo art.1º do Decreto Nº 124-S, de 22/01/2026.",
+                    "04-13": "Feriado estadual - Nossa Senhora da Penha - Amparado pelo art. 1º do Decreto Nº 124-S, de 22/01/2026.",
+                    "04-21": "Feriado nacional - Tiradentes - Amparado pelo art. 1º do Decreto Nº 124-S, de 22/01/2026.",
+                    "05-01": "Feriado nacional - Dia do Trabalhador",
+                    "09-07": "Feriado nacional - Independência do Brasil",
+                    "10-12": "Feriado nacional - Nossa Sra. Aparecida",
+                    "11-02": "Feriado nacional - Finados",
+                    "11-15": "Feriado nacional - Proclamação da República",
+                    "12-25": "Feriado nacional - Natal"
+                };
+
+                const dayNames = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+
+                for (let d = new Date(dStart); d <= dEnd; d.setDate(d.getDate() + 1)) {
+                    const dayStr = fmt(d);
+                    const mdStr = mmdd(d);
+                    const dayRecords = records.filter(r => r.timestamp.startsWith(dayStr));
+                    
+                    const stdPunches = dayRecords.filter(r => {
+                        const t = (r.type || "").toLowerCase();
+                        return !(t.includes('atestado') || t.includes('abono') || t.includes('compensação') || t.includes('compensacao') || t.includes('saldo') || t.includes('3º turno') || t.includes('extra'));
+                    });
+                    
+                    const groupedByType = {};
+                    stdPunches.forEach(r => {
+                        const t = r.type || "";
+                        if (!groupedByType[t]) groupedByType[t] = [];
+                        groupedByType[t].push(r);
+                    });
+                    
+                    const filteredPunchesList = [];
+                    for (const t in groupedByType) {
+                        const pts = groupedByType[t];
+                        const approvedRetros = pts.filter(p => p.is_retroactive && p.is_reviewed);
+                        if (approvedRetros.length > 0) {
+                            filteredPunchesList.push(approvedRetros[approvedRetros.length - 1]);
+                        } else {
+                            filteredPunchesList.push(...pts);
+                        }
+                    }
+                    
+                    const realPunches = filteredPunchesList.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+
+                    const formatTime = (match) => {
+                        if (!match) return "";
+                        let time = match.timestamp.split(' ')[1].substring(0, 5);
+                        if (match.is_retroactive) time += "*";
+                        return time;
+                    };
+
+                    let e1 = "", s1 = "", e2 = "", s2 = "";
+                    realPunches.forEach(p => {
+                        let timeStr = formatTime(p);
+                        if (!timeStr) return;
+                        const t = (p.type || "").trim();
+                        if (t === "Entrada" && !e1) e1 = timeStr;
+                        else if ((t === "Saída Almoço" || t === "Saida Almoco") && !s1) s1 = timeStr;
+                        else if ((t === "Volta Almoço" || t === "Volta Almoco") && !e2) e2 = timeStr;
+                        else if ((t === "Saída" || t === "Saida") && !s2) s2 = timeStr;
+                        else {
+                            if (!e1) e1 = timeStr;
+                            else if (!s1) s1 = timeStr;
+                            else if (!e2) e2 = timeStr;
+                            else if (!s2) s2 = timeStr;
+                        }
+                    });
+
+                    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                    const isHoliday = holidaysModel[mdStr];
+                    
+                    let obs = "";
+
+                    let mObs = [];
+                    let hasAtestado = false;
+                    let hasAbono = false;
+                    dayRecords.forEach(r => {
+                        let t = (r.type || "").toLowerCase();
+                        if (t.includes('atestado')) {
+                            mObs.push("ATESTADO");
+                            hasAtestado = true;
+                        } else if (t.includes('abono')) {
+                            mObs.push("ABONO");
+                            hasAbono = true;
+                        } else if (t.includes('compensação') || t.includes('compensacao') || t.includes('saldo')) {
+                            mObs.push("COMPENSAÇÃO / USO DE SALDO");
+                        }
+                    });
+
+                    if (isHoliday) {
+                        obs = isHoliday;
+                        e1 = " -- "; s1 = " -- "; e2 = " -- "; s2 = " -- ";
+                    } else if (hasAtestado || hasAbono) {
+                        obs = mObs.join(' / ');
+                        e1 = " -- "; s1 = " -- "; e2 = " -- "; s2 = " -- ";
+                    } else if (isWeekend && !e1 && !s1 && !e2 && !s2) {
+                        e1 = " -- "; s1 = " -- "; e2 = " -- "; s2 = " -- ";
+                        if (mObs.length > 0) obs = mObs.join(' / ');
+                    } else {
+                        if (mObs.length > 0) obs = mObs.join(' / ');
+                    }
+
+                    reportData.push([
+                        d.getDate().toString(),
+                        dayNames[d.getDay()],
+                        e1, s1, e2, s2, obs
+                    ]);
+                }
+
+                doc.autoTable({
+                    startY: 64,
+                    margin: { left: 10, right: 10, bottom: 10 }, 
+                    head: [
+                        [
+                            { content: 'APURAÇÃO DIÁRIA', colSpan: 7, styles: { halign: 'center', fillColor: [240, 240, 240], textColor: [0,0,0], fontStyle: 'bold' } }
+                        ],
+                        [
+                            { content: 'Data', rowSpan: 2, colSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [255, 255, 255], textColor: [0,0,0] } },
+                            { content: '1º Expediente', colSpan: 2, styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0,0,0] } },
+                            { content: '2º Expediente', colSpan: 2, styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0,0,0] } },
+                            { content: 'Observações', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [255, 255, 255], textColor: [0,0,0] } }
+                        ],
+                        [
+                            { content: 'Entrada', styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0,0,0] } },
+                            { content: 'Saída', styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0,0,0] } },
+                            { content: 'Entrada', styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0,0,0] } },
+                            { content: 'Saída', styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0,0,0] } }
+                        ]
+                    ],
+                    body: reportData,
+                    theme: 'grid',
+                    styles: {
+                        fontSize: 7,
+                        cellPadding: 0.8,
+                        textColor: [0, 0, 0],
+                        lineColor: [150, 150, 150],
+                        lineWidth: 0.1,
+                        valign: 'middle'
+                    },
+                    columnStyles: {
+                        0: { cellWidth: 8, halign: 'center' }, // Day num
+                        1: { cellWidth: 10, halign: 'center' }, // Day name
+                        2: { cellWidth: 16, halign: 'center' }, // Ent 1
+                        3: { cellWidth: 16, halign: 'center' }, // Sai 1
+                        4: { cellWidth: 16, halign: 'center' }, // Ent 2
+                        5: { cellWidth: 16, halign: 'center' }, // Sai 2
+                        6: { cellWidth: 'auto', halign: 'left' }  // Obs
+                    }
+                });
+
+                let finalY = doc.lastAutoTable.finalY + 12;
+                if (finalY > 280) {
+                    doc.addPage();
+                    finalY = 30;
+                }
+
+                doc.setFontSize(8);
+                var sign1 = new jsPDF.AcroForm.TextField();
+                sign1.Rect = [20, finalY, 80, 5];
+                sign1.value = userName.toUpperCase();
+                sign1.textAlign = 'center';
+                doc.addField(sign1);
+                doc.text("(assinado eletronicamente)", 60, finalY + 8, { align: 'center' });
+                
+                var sign2 = new jsPDF.AcroForm.TextField();
+                sign2.Rect = [110, finalY, 80, 5];
+                sign2.value = localStorage.getItem('user_name') ? localStorage.getItem('user_name').toUpperCase() : "ADMINISTRADOR";
+                sign2.textAlign = 'center';
+                doc.addField(sign2);
+                doc.text("(assinado eletronicamente)", 150, finalY + 8, { align: 'center' });
+
+                doc.save(`edocs - ${userName} - frequencia ${monthStr}-${yearStr}.pdf`);
+
+            } catch (error) {
+                console.error(error);
+                alert("Erro ao gerar PDF: " + error.message);
+            } finally {
+                document.body.style.cursor = 'default';
+            }
+        }
+    </script>
+
+</body>
+</html>
