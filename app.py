@@ -72,6 +72,18 @@ def get_user_sync_lock(matricula):
             SYNC_LOCKS[matricula] = threading.Lock()
         return SYNC_LOCKS[matricula]
 
+def get_fifth_business_day(year, month):
+    import datetime
+    holidays = [(1, 1), (4, 21), (5, 1), (9, 7), (10, 12), (11, 2), (11, 15), (12, 25)]
+    count = 0
+    d = datetime.date(year, month, 1)
+    while count < 5:
+        if d.weekday() < 5 and (d.month, d.day) not in holidays:
+            count += 1
+        if count < 5:
+            d += datetime.timedelta(days=1)
+    return d
+
 def get_remote_db_connection():
     """Explicitly tries to connect to SQL Server, ignoring USE_SQLITE."""
     try:
@@ -887,12 +899,26 @@ def punch_retroactive(curr_user_mat, role):
 @app.route('/api/history', methods=['GET'])
 @token_required
 def history(curr_user_mat, role):
+    user_matricula = curr_user_mat
+    
+    today = datetime.date.today()
+    fifth_bd = get_fifth_business_day(today.year, today.month)
+    show_reminder = (today == fifth_bd)
+    
+    # Logic: Show current month + previous month ONLY until the 5th business day of current month.
+    if today >= fifth_bd:
+        cutoff = datetime.date(today.year, today.month, 1)
+    else:
+        first_curr = datetime.date(today.year, today.month, 1)
+        prev = first_curr - datetime.timedelta(days=1)
+        cutoff = datetime.date(prev.year, prev.month, 1)
+    
+    cutoff_str = cutoff.strftime('%Y-%m-%d %H:%M:%S')
+    
     conn = get_db_connection()
     try:
         is_sqlite = isinstance(conn, sqlite3.Connection)
         ph = get_ph(conn)
-        
-        user_matricula = curr_user_mat
         clear_cache_signal = False
 
         # Get user info for inclusive filtering
@@ -956,9 +982,9 @@ def history(curr_user_mat, role):
                     SELECT record_type, timestamp, neighborhood, city, transaction_id, is_retroactive, justification, document_path, is_reviewed
                     FROM TimeRecords {nolock}
                     WHERE matricula = {ph} 
-                      AND timestamp >= DATEADD(day, -90, GETDATE())
+                      AND timestamp >= {ph}
                     ORDER BY timestamp DESC
-                """, (user_matricula,))
+                """, (user_matricula, cutoff_str))
                 rows = cursor.fetchall()
                 for row in rows:
                     ts = rf(row, 'timestamp')
@@ -996,9 +1022,9 @@ def history(curr_user_mat, role):
                 SELECT record_type, timestamp, neighborhood, city, transaction_id, is_retroactive, justification, document_path, is_reviewed
                 FROM TimeRecords 
                 WHERE matricula = ? 
-                  AND timestamp >= date('now', '-90 days')
+                  AND timestamp >= ?
                 ORDER BY timestamp DESC
-            """, (user_matricula,))
+            """, (user_matricula, cutoff_str))
             rows = lcur.fetchall()
             print(f"DEBUG: Local history found {len(rows)} rows.")
             for row in rows:
@@ -1031,10 +1057,9 @@ def history(curr_user_mat, role):
         history_list = records + self_pending_records(user_matricula)
         response_data = history_list
         if clear_cache_signal:
-            # Wrap in an object if we need to signal cache clearing
-            return jsonify({'records': history_list, 'clear_cache': True})
+            return jsonify({'records': history_list, 'clear_cache': True, 'show_reminder': show_reminder})
         
-        return jsonify(history_list)
+        return jsonify({'records': history_list, 'clear_cache': False, 'show_reminder': show_reminder})
     finally:
         try:
             conn.close()

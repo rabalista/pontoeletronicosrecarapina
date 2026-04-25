@@ -145,6 +145,17 @@
 
 <!-- Main Content Canvas -->
 <main class="pt-28 pb-24 xl:pb-12 px-4 md:px-8 xl:pl-80 max-w-[1440px] mx-auto">
+
+<!-- Reminder Banner -->
+<div id="edocsReminder" class="hidden mb-6 p-4 bg-tertiary-container text-on-tertiary-container rounded-xl border border-tertiary/20 flex flex-col md:flex-row items-center gap-4 animate-pulse shadow-lg">
+    <span class="material-symbols-outlined text-3xl md:text-4xl">print</span>
+    <div class="flex-1 text-center md:text-left">
+        <p class="font-bold text-lg">Aviso Importante: 5º Dia Útil!</p>
+        <p class="text-sm">Por favor, gere e imprima o seu relatório E-DOCS referente ao mês anterior agora mesmo. A partir de amanhã, apenas o mês atual estará disponível nesta tela.</p>
+    </div>
+    <button onclick="document.getElementById('edocsModal').classList.remove('hidden')" class="px-6 py-2 bg-tertiary text-on-tertiary rounded-lg font-bold shadow hover:bg-tertiary/90 transition-colors">Abrir E-DOCS</button>
+</div>
+
 <!-- Hero Clock Section -->
 <section class="mb-8 md:mb-12 text-center">
 <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary-fixed text-on-primary-fixed-variant text-xs font-bold uppercase tracking-widest mb-4">
@@ -936,6 +947,12 @@
                         localStorage.setItem(cacheKey, JSON.stringify(merged));
                         merged.forEach(r => allRecords.push({ ...r, pending: !!r.pending }));
                         apiWorked = true;
+                        
+                        if (data && data.show_reminder) {
+                            document.getElementById('edocsReminder').classList.remove('hidden');
+                        } else {
+                            document.getElementById('edocsReminder').classList.add('hidden');
+                        }
                     }
                 } else if (response.status >= 500) {
                     throw new Error("Server History Error");
