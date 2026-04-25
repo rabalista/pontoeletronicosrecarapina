@@ -1198,7 +1198,7 @@
                     const realPunches = filteredPunchesList.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 
                     const formatTime = (match) => {
-                        if (!match) return "";
+                        if (!match || (match.is_retroactive && !match.is_reviewed)) return "";
                         let time = match.timestamp.split(' ')[1].substring(0, 5);
                         if (match.is_retroactive) time += "*";
                         return time;
@@ -1209,6 +1209,9 @@
                         let timeStr = formatTime(p);
                         if (!timeStr) return;
                         const t = (p.type || "").trim();
+                        const tLow = t.toLowerCase();
+                        if (tLow.includes('saldo') || tLow.includes('compens') || tLow.includes('atestado') || tLow.includes('abono') || tLow.includes('extra') || tLow.includes('3º turno')) return;
+                        
                         if (t === "Entrada" && !e1) e1 = timeStr;
                         else if ((t === "Saída Almoço" || t === "Saida Almoco") && !s1) s1 = timeStr;
                         else if ((t === "Volta Almoço" || t === "Volta Almoco") && !e2) e2 = timeStr;
@@ -1229,6 +1232,7 @@
                     let mObs = [];
                     let hasAtestado = false;
                     let hasAbono = false;
+                    let hasComp = false;
                     dayRecords.forEach(r => {
                         let t = (r.type || "").toLowerCase();
                         if (t.includes('atestado')) {
@@ -1239,6 +1243,7 @@
                             hasAbono = true;
                         } else if (t.includes('compensação') || t.includes('compensacao') || t.includes('saldo')) {
                             mObs.push("COMPENSAÇÃO / USO DE SALDO");
+                            hasComp = true;
                         }
                     });
 
@@ -1248,7 +1253,7 @@
                     } else if (hasAtestado || hasAbono) {
                         obs = mObs.join(' / ');
                         e1 = " -- "; s1 = " -- "; e2 = " -- "; s2 = " -- ";
-                    } else if (isWeekend && !e1 && !s1 && !e2 && !s2) {
+                    } else if ((isWeekend || hasComp) && !e1 && !s1 && !e2 && !s2) {
                         e1 = " -- "; s1 = " -- "; e2 = " -- "; s2 = " -- ";
                         if (mObs.length > 0) obs = mObs.join(' / ');
                     } else {

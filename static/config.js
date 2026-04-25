@@ -1,7 +1,7 @@
 // VERSION: 16.1 (Cargo-Fix) - 2026-01-31
 const API_CANDIDATES = [
   "https://nga-postauditory-unharmonically.ngrok-free.dev",
-  "http://10.131.248.233:5005",
+  "http://10.131.248.176:5005",
 
   "https://background-dakota-rain-reuters.trycloudflare.com",
   "https://organic-friendly-ethics-jewish.trycloudflare.com",

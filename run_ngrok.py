@@ -116,6 +116,9 @@ def run_ngrok():
 def run_backend():
     print("🚀 Iniciando Backend na porta 5005...")
     try:
+        # Mata backend anterior se existir (evita processos zumbis que não atualizam)
+        os.system('wmic process where "commandline like \'%app.py%\' and name like \'%python%\'" call terminate >nul 2>&1')
+        
         # Reusa o python atual para rodar app.py
         subprocess.run([sys.executable, "app.py"], check=True)
     except Exception as e:
