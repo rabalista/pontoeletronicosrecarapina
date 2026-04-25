@@ -1,0 +1,31 @@
+COMO ESPELHAR O SISTEMA EM OUTRA MÁQUINA
+=========================================
+
+Para levar o sistema para um computador de backup, siga estes passos:
+
+1. NA MÁQUINA PRINCIPAL (ORIGEM):
+---------------------------------
+- Execute o arquivo "ENVIAR_PARA_GITHUB.bat".
+- Responda "S" para gerar o backup do banco.
+- Aguarde o envio terminar.
+
+2. NA MÁQUINA DE BACKUP (DESTINO):
+----------------------------------
+- Se for a primeira vez:
+    - Instale o Python (3.10 ou superior).
+    - Instale o SQL Server Express e o SQL Management Studio.
+    - Crie o usuário 'admin_site' com a senha 'Sedu@2026' no SQL Server.
+    - Crie um banco de dados vazio chamado 'PontoEletronicoDB'.
+    - Baixe o Git e clone o repositório:
+      git clone https://github.com/rabalista/pontoeletronicosrecarapina.git C:\usr\PontoEletronico
+
+- Se o sistema já estiver lá:
+    - Execute o arquivo "SINCRONIZAR_DO_GITHUB.bat" para baixar o código novo e o arquivo .bak.
+    - Execute o arquivo "RESTAURAR_BANCO.bat" para importar os dados para o SQL Server.
+    - Certifique-se de que o arquivo ".env" existe na pasta (ele não vai para o GitHub por segurança, você deve copiá-lo manualmente uma única vez).
+
+3. PARA RODAR:
+--------------
+- Execute o "INICIAR_SISTEMA.bat" normalmente.
+
+DICA: Mantenha sempre o arquivo .env guardado em um local seguro, pois ele contém as chaves de acesso ao banco de dados.
