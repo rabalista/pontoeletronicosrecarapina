@@ -150,10 +150,10 @@
 <div id="edocsReminder" class="hidden mb-6 p-4 bg-tertiary-container text-on-tertiary-container rounded-xl border border-tertiary/20 flex flex-col md:flex-row items-center gap-4 animate-pulse shadow-lg">
     <span class="material-symbols-outlined text-3xl md:text-4xl">print</span>
     <div class="flex-1 text-center md:text-left">
-        <p class="font-bold text-lg">Aviso Importante: 5º Dia Útil!</p>
-        <p class="text-sm">Por favor, gere e imprima o seu relatório E-DOCS referente ao mês anterior agora mesmo. A partir de amanhã, apenas o mês atual estará disponível nesta tela.</p>
+        <p class="font-bold text-lg">Aviso Importante: Relatório do Mês Anterior</p>
+        <p class="text-sm">Por favor, gere e imprima o seu relatório E-DOCS referente ao mês anterior. Após o 5º dia útil, apenas o mês atual ficará disponível nesta tela.</p>
     </div>
-    <button onclick="document.getElementById('edocsModal').classList.remove('hidden')" class="px-6 py-2 bg-tertiary text-on-tertiary rounded-lg font-bold shadow hover:bg-tertiary/90 transition-colors">Abrir E-DOCS</button>
+    <button onclick="downloadEDocsReport(true)" class="px-6 py-2 bg-tertiary text-on-tertiary rounded-lg font-bold shadow hover:bg-tertiary/90 transition-colors">Gerar E-DOCS Anterior</button>
 </div>
 
 <!-- Hero Clock Section -->
@@ -1192,7 +1192,7 @@
         }
 
 
-        async function downloadEDocsReport() {
+        async function downloadEDocsReport(forcePrevious = false) {
             if (!window.jspdf) { alert("Biblioteca PDF carregando..."); return; }
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ orientation: 'portrait', format: 'a4' });
@@ -1214,7 +1214,12 @@
             const matricula = localStorage.getItem('matricula') || getMatricula() || "";
             const s = document.getElementById('startDate').value;
             let reportDate = new Date();
-            if (s) reportDate = new Date(s + "T12:00:00");
+            
+            if (forcePrevious) {
+                reportDate.setMonth(reportDate.getMonth() - 1);
+            } else if (s) {
+                reportDate = new Date(s + "T12:00:00");
+            }
 
             const monthStr = String(reportDate.getMonth() + 1).padStart(2, '0');
             const yearStr = reportDate.getFullYear();

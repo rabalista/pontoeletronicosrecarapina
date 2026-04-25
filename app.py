@@ -903,7 +903,8 @@ def history(curr_user_mat, role):
     
     today = datetime.date.today()
     fifth_bd = get_fifth_business_day(today.year, today.month)
-    show_reminder = (today == fifth_bd)
+    # Show the reminder from day 1 until the 5th business day
+    show_reminder = (today <= fifth_bd)
     
     # Logic: Show current month + previous month ONLY until the 5th business day of current month.
     if today >= fifth_bd:
