@@ -117,6 +117,28 @@
 <span class="text-sm font-medium">System</span>
 </a>
 </nav>
+
+<!-- Mini Calendário Feriados/Facultativos -->
+<div class="mt-4 p-3 bg-white/60 rounded-xl border border-outline-variant/20 shadow-sm text-sm flex-1 flex flex-col min-h-0">
+    <h3 class="font-bold text-primary text-xs mb-2 flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">calendar_month</span> Feriados / Facultativos</h3>
+    <form onsubmit="addCustomHoliday(event)" class="flex flex-col gap-2 mb-2">
+        <input type="date" id="customHolidayDate" class="w-full text-xs p-1.5 rounded border border-outline-variant/30" required>
+        <input type="text" id="customHolidayDesc" placeholder="Ex: Ponto Facultativo" class="w-full text-xs p-1.5 rounded border border-outline-variant/30" required>
+        <button type="submit" class="w-full bg-primary text-white text-xs py-1.5 rounded font-bold hover:bg-primary/90 transition-colors">Adicionar</button>
+    </form>
+    <div id="customHolidaysList" class="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-1 text-[10px]">
+        <!-- Lista preenchida via JS -->
+    </div>
+</div>
+<!-- Superintendente Config -->
+<div class="mt-2 p-3 bg-white/60 rounded-xl border border-outline-variant/20 shadow-sm text-sm">
+    <h3 class="font-bold text-primary text-xs mb-2 flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">edit_document</span> Assinatura E-DOCS</h3>
+    <form onsubmit="updateSuperintendent(event)" class="flex flex-col gap-2">
+        <label class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">Superintendente / Chefia</label>
+        <input type="text" id="superintendentInput" placeholder="TIAGO GUERCON DA SILVA" class="w-full text-xs p-1.5 rounded border border-outline-variant/30" required>
+        <button type="submit" class="w-full bg-primary text-white text-xs py-1.5 rounded font-bold hover:bg-primary/90 transition-colors">Salvar Nome</button>
+    </form>
+</div>
 <div class="mt-auto p-4">
 <button onclick="logout()" class="w-full py-3 px-4 bg-gradient-to-r from-red-600 to-red-400 text-white flex items-center justify-center gap-2 rounded-xl font-bold shadow-lg shadow-red-500/20 active:scale-95 transition-all text-sm">
                 <span class="material-symbols-outlined text-[18px]">logout</span> Sair
@@ -181,12 +203,16 @@
 <h2 class="text-xl font-bold text-on-surface">Gerar Relatórios</h2>
 </div>
 <div class="space-y-6">
-<div class="grid grid-cols-1 md:grid-cols-1 gap-4">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 <div class="space-y-2">
 <label class="text-sm font-bold text-on-surface-variant">Colaborador</label>
 <select id="userSelect" class="w-full bg-white/50 border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary/20 appearance-none">
 <option value="">Todos (Geral)</option>
 </select>
+</div>
+<div class="space-y-2">
+<label class="text-sm font-bold text-on-surface-variant">Mês / Ano (Para E-DOCS)</label>
+<input type="month" id="reportMonthSelect" class="w-full bg-white/50 border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary/20">
 </div>
 </div>
 <div class="flex flex-wrap gap-3 pt-4">
@@ -379,6 +405,7 @@
                 await loadUsersTable();
                 await loadConfig();
                 await loadRetroactivePunches();
+                await loadCustomHolidays();
                 initSelectionLogic();
             } catch (error) {
                 console.error("Erro ao carregar usuários", error);
@@ -452,7 +479,19 @@
             try {
                 if (window.API_READY) await window.API_READY;
                 let path = `/api/admin/report`;
-                if (userId) path += `?user_id=${userId}`;
+                const params = [];
+                if (userId) params.push(`user_id=${userId}`);
+                
+                const reportMonthVal = document.getElementById('reportMonthSelect').value;
+                if (reportMonthVal) {
+                    const parts = reportMonthVal.split('-');
+                    params.push(`year=${parts[0]}`);
+                }
+                
+                if (params.length > 0) {
+                    path += `?${params.join('&')}`;
+                }
+                
                 const response = await apiFetch(path, { headers: { 'Authorization': `Bearer ${token}` } });
                 if (response.ok) {
                     const blob = await response.blob();
@@ -606,6 +645,10 @@
                 if (config.location_edit_password) {
                     document.getElementById('locationPasswordInput').value = config.location_edit_password;
                 }
+                if (config.superintendent_name) {
+                    document.getElementById('superintendentInput').value = config.superintendent_name;
+                    window.superintendentName = config.superintendent_name;
+                }
             } catch (error) {
                 console.error("Erro ao carregar configurações", error);
             }
@@ -633,6 +676,108 @@
                 }
             } catch (error) {
                 alert('Erro de conexão ao atualizar configuração.');
+            }
+        }
+
+        async function updateSuperintendent(e) {
+            e.preventDefault();
+            const token = localStorage.getItem('ponto_token');
+            const newName = document.getElementById('superintendentInput').value.trim();
+            if (!newName) return;
+            try {
+                if (window.API_READY) await window.API_READY;
+                const res = await apiFetch(`/api/admin/config`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ 'superintendent_name': newName })
+                });
+                if (res.ok) {
+                    window.superintendentName = newName;
+                    alert('Nome do Superintendente salvo com sucesso!');
+                } else {
+                    alert('Erro ao salvar nome');
+                }
+            } catch (error) {
+                alert('Erro de conexão ao salvar nome.');
+            }
+        }
+
+        async function loadCustomHolidays() {
+            try {
+                const res = await fetch('/api/holidays');
+                const data = await res.json();
+                const list = document.getElementById('customHolidaysList');
+                list.innerHTML = '';
+                const sortedKeys = Object.keys(data).sort();
+                for (let key of sortedKeys) {
+                    const desc = data[key];
+                    const parts = key.split('-');
+                    const displayDate = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : key;
+                    const div = document.createElement('div');
+                    div.className = "flex items-center justify-between bg-white p-1.5 rounded border border-outline-variant/20 mb-1";
+                    div.innerHTML = `
+                        <div class="overflow-hidden">
+                            <strong class="text-primary text-[10px]">${displayDate}</strong><br/>
+                            <span class="text-on-surface-variant text-[9px] block truncate" title="${desc}">${desc}</span>
+                        </div>
+                        <button type="button" onclick="deleteCustomHoliday('${key}')" class="text-error hover:bg-error/10 p-1 rounded transition-colors ml-2 flex-shrink-0">
+                            <span class="material-symbols-outlined text-[16px]">delete</span>
+                        </button>
+                    `;
+                    list.appendChild(div);
+                }
+            } catch (e) {
+                console.error("Erro ao carregar feriados", e);
+            }
+        }
+
+        async function addCustomHoliday(e) {
+            e.preventDefault();
+            const dateStr = document.getElementById('customHolidayDate').value;
+            const desc = document.getElementById('customHolidayDesc').value;
+            const token = localStorage.getItem('ponto_token');
+            if(!dateStr || !desc) return;
+
+            try {
+                const res = await fetch('/api/admin/holidays', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ date_str: dateStr, description: desc })
+                });
+                if(res.ok) {
+                    document.getElementById('customHolidayDate').value = '';
+                    document.getElementById('customHolidayDesc').value = '';
+                    await loadCustomHolidays();
+                } else {
+                    const err = await res.json();
+                    alert(err.message || "Erro ao adicionar feriado");
+                }
+            } catch (error) {
+                alert("Erro de conexão ao adicionar feriado");
+            }
+        }
+
+        async function deleteCustomHoliday(dateStr) {
+            if(!confirm(`Excluir feriado de ${dateStr}?`)) return;
+            const token = localStorage.getItem('ponto_token');
+            try {
+                const res = await fetch(`/api/admin/holidays/${dateStr}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if(res.ok) {
+                    await loadCustomHolidays();
+                } else {
+                    alert("Erro ao excluir feriado");
+                }
+            } catch (error) {
+                alert("Erro de conexão ao excluir feriado");
             }
         }
 
@@ -871,10 +1016,25 @@
                 const dStart = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1);
                 const dEnd = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0);
                 const fmt = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+                const mmdd = (d) => String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
                 const reportData = [];
+
+                const holidaysModel = {
+                    "01-01": "FERIADO", "04-21": "FERIADO", "05-01": "FERIADO", "09-07": "FERIADO",
+                    "10-12": "FERIADO", "11-02": "FERIADO", "11-15": "FERIADO", "12-25": "FERIADO"
+                };
+                try {
+                    const hRes = await fetch('/api/holidays');
+                    if (hRes.ok) {
+                        const cHol = await hRes.json();
+                        Object.assign(holidaysModel, cHol);
+                    }
+                } catch(e) {}
 
                 for (let d = new Date(dStart); d <= dEnd; d.setDate(d.getDate() + 1)) {
                     const dayStr = fmt(d);
+                    const mdStr = mmdd(d);
+                    const isHoliday = holidaysModel[dayStr] || holidaysModel[mdStr];
                     const dayRecords = records.filter(r => r.timestamp.startsWith(dayStr));
                     
                     const stdPunches = dayRecords.filter(r => {
@@ -939,7 +1099,9 @@
                     ];
 
                     const dayOfWeek = d.getDay();
-                    if ((dayOfWeek === 0 || dayOfWeek === 6) && realPunches.length === 0) {
+                    if (isHoliday) {
+                        row = [d.getDate().toString(), isHoliday.toUpperCase()];
+                    } else if ((dayOfWeek === 0 || dayOfWeek === 6) && realPunches.length === 0) {
                         row = [d.getDate().toString(), dayOfWeek === 0 ? "DOMINGO" : "SÁBADO"];
                     }
                     reportData.push(row);
@@ -1100,6 +1262,11 @@
                 }
 
                 let reportDate = new Date();
+                const reportMonthVal = document.getElementById('reportMonthSelect').value;
+                if (reportMonthVal) {
+                    const parts = reportMonthVal.split('-');
+                    reportDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+                }
                 const monthStr = String(reportDate.getMonth() + 1).padStart(2, '0');
                 const yearStr = reportDate.getFullYear();
 
@@ -1165,6 +1332,15 @@
                     "12-25": "Feriado nacional - Natal"
                 };
 
+                // Fetch Custom Holidays
+                try {
+                    const hRes = await fetch('/api/holidays');
+                    if (hRes.ok) {
+                        const cHol = await hRes.json();
+                        Object.assign(holidaysModel, cHol);
+                    }
+                } catch(e) { console.warn("Failed to load custom holidays"); }
+
                 const dayNames = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 
                 for (let d = new Date(dStart); d <= dEnd; d.setDate(d.getDate() + 1)) {
@@ -1225,7 +1401,7 @@
                     });
 
                     const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                    const isHoliday = holidaysModel[mdStr];
+                    const isHoliday = holidaysModel[dayStr] || holidaysModel[mdStr];
                     
                     let obs = "";
 
@@ -1324,7 +1500,7 @@
                 
                 var sign2 = new jsPDF.AcroForm.TextField();
                 sign2.Rect = [110, finalY, 80, 5];
-                sign2.value = localStorage.getItem('user_name') ? localStorage.getItem('user_name').toUpperCase() : "ADMINISTRADOR";
+                sign2.value = (window.superintendentName || localStorage.getItem('user_name') || "ADMINISTRADOR").toUpperCase();
                 sign2.textAlign = 'center';
                 doc.addField(sign2);
                 doc.text("(assinado eletronicamente)", 150, finalY + 8, { align: 'center' });

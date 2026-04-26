@@ -1196,6 +1196,15 @@
             if (!window.jspdf) { alert("Biblioteca PDF carregando..."); return; }
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ orientation: 'portrait', format: 'a4' });
+            
+            let superintendentName = "TIAGO GUERCON DA SILVA";
+            try {
+                const confRes = await fetch('/api/config/public');
+                if (confRes.ok) {
+                    const cData = await confRes.json();
+                    if (cData.superintendent_name) superintendentName = cData.superintendent_name;
+                }
+            } catch(e) {}
 
             const logo = new Image();
             logo.src = '/static/brasao.png'; 
@@ -1314,6 +1323,15 @@
                 "12-25": "Feriado nacional - Natal"
             };
 
+            // Fetch Custom Holidays
+            try {
+                const hRes = await fetch('/api/holidays');
+                if (hRes.ok) {
+                    const cHol = await hRes.json();
+                    Object.assign(holidaysModel, cHol);
+                }
+            } catch(e) { console.warn("Failed to load custom holidays"); }
+
             const dayNames = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 
             for (let d = new Date(dStart); d <= dEnd; d.setDate(d.getDate() + 1)) {
@@ -1373,7 +1391,7 @@
                 });
 
                 const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                const isHoliday = holidaysModel[mdStr];
+                const isHoliday = holidaysModel[dayStr] || holidaysModel[mdStr];
                 
                 let obs = "";
                 let mObs = [];
@@ -1471,7 +1489,7 @@
             
             var sign2 = new jsPDF.AcroForm.TextField();
             sign2.Rect = [110, finalY, 80, 5];
-            sign2.value = "TIAGO GUERCON DA SILVA";
+            sign2.value = superintendentName;
             sign2.textAlign = 'center';
             doc.addField(sign2);
             doc.text("(assinado eletronicamente)", 150, finalY + 8, { align: 'center' });

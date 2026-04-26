@@ -53,6 +53,46 @@ if os.getenv('INIT_DB_ON_START', 'false').lower() == 'true':
     except Exception:
         pass
 
+def ensure_sql_server_tables():
+    # Only run if not using SQLite exclusively
+    if not USE_SQLITE:
+        try:
+            import pyodbc
+            conn_str = f'DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={db_server};DATABASE={db_name};UID={db_user};PWD={db_password};TrustServerCertificate=yes;Connection Timeout=5'
+            conn = pyodbc.connect(conn_str)
+            conn.autocommit = True
+            cursor = conn.cursor()
+            cursor.execute("""
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='CustomHolidays' and xtype='U')
+            BEGIN
+                CREATE TABLE CustomHolidays (
+                    date_str NVARCHAR(10) PRIMARY KEY,
+                    description NVARCHAR(255) NOT NULL
+                )
+            END
+            """)
+            conn.close()
+        except Exception as e:
+            try:
+                import pymssql
+                conn = pymssql.connect(server=db_server, user=db_user, password=db_password, database=db_name, timeout=5, autocommit=True)
+                cursor = conn.cursor()
+                cursor.execute("""
+                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='CustomHolidays' and xtype='U')
+                BEGIN
+                    CREATE TABLE CustomHolidays (
+                        date_str NVARCHAR(10) PRIMARY KEY,
+                        description NVARCHAR(255) NOT NULL
+                    )
+                END
+                """)
+                conn.close()
+            except Exception as ex:
+                print("Failed to ensure SQL Server tables:", ex)
+
+# Ensure SQL Server tables on boot
+threading.Thread(target=ensure_sql_server_tables).start()
+
 # Global DB Status
 DB_ONLINE = False
 
@@ -245,6 +285,12 @@ def ensure_sqlite_schema(conn):
         CREATE TABLE IF NOT EXISTS SystemConfig (
             key TEXT PRIMARY KEY,
             value TEXT
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS CustomHolidays (
+            date_str TEXT PRIMARY KEY,
+            description TEXT NOT NULL
         )
     """)
     # Default location edit password
@@ -1250,6 +1296,8 @@ def get_user_report(curr_user_mat, role):
         wb = openpyxl.load_workbook(template_path)
         m_names = ["JAN", "FEV", "MAR", "ABR", "MAIO", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"]
         
+        all_holidays = get_all_holidays()
+        
         m_year = datetime.datetime.now().year
         if records:
             ts = records[-1]['timestamp']
@@ -1279,6 +1327,20 @@ def get_user_report(curr_user_mat, role):
                 for d_idx in range(1, num_days + 1):
                     row_idx = 13 + d_idx
                     day_key = f"{m_key}-{d_idx:02d}"
+                    
+                    # Holiday logic
+                    current_date = datetime.date(m_year, m_num, d_idx)
+                    is_weekend = current_date.weekday() >= 5
+                    is_holiday = False
+                    if is_weekend:
+                        is_holiday = True
+                    elif current_date.strftime('%m-%d') in all_holidays:
+                        is_holiday = True
+                    elif day_key in all_holidays:
+                        is_holiday = True
+                        
+                    ws.cell(row=row_idx, column=1, value='F' if is_holiday else 'U')
+                    
                     punches = month_data["days"].get(day_key, [])
                     
                     if punches:
@@ -1786,6 +1848,18 @@ def get_location_password():
     except:
         return jsonify({'password': 'admin123'})
 
+@app.route('/api/config/public', methods=['GET'])
+def get_public_config():
+    try:
+        conn = sqlite3.connect(sqlite_path)
+        cur = conn.cursor()
+        cur.execute("SELECT value FROM SystemConfig WHERE key = 'superintendent_name'")
+        row = cur.fetchone()
+        conn.close()
+        return jsonify({'superintendent_name': row[0] if row else 'TIAGO GUERCON DA SILVA'})
+    except Exception as e:
+        return jsonify({'superintendent_name': 'TIAGO GUERCON DA SILVA'})
+
 @app.route('/api/admin/config', methods=['GET'])
 @token_required
 def get_admin_config(curr_user_mat, role):
@@ -1818,6 +1892,122 @@ def update_admin_config(curr_user_mat, role):
         return jsonify({'message': 'Configuration updated successfully'})
     except Exception as e:
         return jsonify({'message': str(e)}), 500
+
+def get_all_holidays():
+    holidays = set()
+    # Fixed national holidays (mm-dd)
+    fixed = ['01-01', '04-03', '04-13', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '12-25']
+    for f in fixed: holidays.add(f)
+    
+    try:
+        conn = get_db_connection()
+        is_sqlite = isinstance(conn, sqlite3.Connection)
+        nolock = "" if is_sqlite else "WITH (NOLOCK)"
+        cur = conn.cursor()
+        cur.execute(f"SELECT date_str FROM CustomHolidays {nolock}")
+        for r in cur.fetchall():
+            holidays.add(rf(r, 'date_str'))
+        conn.close()
+    except Exception as e:
+        try:
+            lconn = sqlite3.connect(sqlite_path)
+            lcur = lconn.cursor()
+            lcur.execute("SELECT date_str FROM CustomHolidays")
+            for r in lcur.fetchall():
+                holidays.add(r[0])
+            lconn.close()
+        except: pass
+    return holidays
+
+@app.route('/api/holidays', methods=['GET'])
+def get_holidays():
+    conn = get_db_connection()
+    is_sqlite = isinstance(conn, sqlite3.Connection)
+    nolock = "" if is_sqlite else "WITH (NOLOCK)"
+    try:
+        cur = conn.cursor()
+        cur.execute(f"SELECT date_str, description FROM CustomHolidays {nolock}")
+        rows = cur.fetchall()
+        return jsonify({rf(r, 'date_str'): rf(r, 'description') for r in rows})
+    except Exception as e:
+        try:
+            lconn = sqlite3.connect(sqlite_path)
+            lcur = lconn.cursor()
+            lcur.execute("SELECT date_str, description FROM CustomHolidays")
+            rows = lcur.fetchall()
+            lconn.close()
+            return jsonify({r[0]: r[1] for r in rows})
+        except:
+            return jsonify({})
+    finally:
+        try: conn.close()
+        except: pass
+
+@app.route('/api/admin/holidays', methods=['POST'])
+@token_required
+def add_holiday(curr_user_mat, role):
+    if role != 'admin': return jsonify({'message': 'Unauthorized'}), 401
+    data = request.json
+    date_str = data.get('date_str')
+    desc = data.get('description')
+    if not date_str or not desc: return jsonify({'message': 'Missing data'}), 400
+    
+    conn = get_db_connection()
+    ph = get_ph(conn)
+    is_sqlite = isinstance(conn, sqlite3.Connection)
+    try:
+        cur = conn.cursor()
+        if is_sqlite:
+            cur.execute("INSERT OR REPLACE INTO CustomHolidays (date_str, description) VALUES (?, ?)", (date_str, desc))
+            conn.commit()
+        else:
+            cur.execute(f"""
+                IF EXISTS (SELECT * FROM CustomHolidays WHERE date_str = {ph})
+                    UPDATE CustomHolidays SET description = {ph} WHERE date_str = {ph}
+                ELSE
+                    INSERT INTO CustomHolidays (date_str, description) VALUES ({ph}, {ph})
+            """, (date_str, desc, date_str, date_str, desc))
+            conn.commit()
+            
+        try:
+            lconn = sqlite3.connect(sqlite_path)
+            lcur = lconn.cursor()
+            lcur.execute("INSERT OR REPLACE INTO CustomHolidays (date_str, description) VALUES (?, ?)", (date_str, desc))
+            lconn.commit()
+            lconn.close()
+        except: pass
+        return jsonify({'message': 'Holiday added'})
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
+@app.route('/api/admin/holidays/<date_str>', methods=['DELETE'])
+@token_required
+def delete_holiday(curr_user_mat, role, date_str):
+    if role != 'admin': return jsonify({'message': 'Unauthorized'}), 401
+    conn = get_db_connection()
+    ph = get_ph(conn)
+    try:
+        cur = conn.cursor()
+        cur.execute(f"DELETE FROM CustomHolidays WHERE date_str = {ph}", (date_str,))
+        if not isinstance(conn, sqlite3.Connection): conn.commit()
+        else: conn.commit()
+        
+        try:
+            lconn = sqlite3.connect(sqlite_path)
+            lcur = lconn.cursor()
+            lcur.execute("DELETE FROM CustomHolidays WHERE date_str = ?", (date_str,))
+            lconn.commit()
+            lconn.close()
+        except: pass
+        return jsonify({'message': 'Holiday deleted'})
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
 
 def get_previous_years_balance(user_records, m_year, daily_hours):
     import datetime
@@ -1991,7 +2181,11 @@ def get_admin_report_excel(curr_user_mat, role):
                 
                 # Determine year
                 m_year = datetime.datetime.now().year
-                if user_records:
+                target_year_arg = request.args.get('year')
+                if target_year_arg:
+                    try: m_year = int(target_year_arg)
+                    except: pass
+                elif user_records:
                     ts = rf(user_records[-1], 'timestamp')
                     if ts:
                         dtt = ts if isinstance(ts, datetime.datetime) else datetime.datetime.strptime(str(ts).split('.')[0], '%Y-%m-%d %H:%M:%S')
@@ -2019,6 +2213,7 @@ def get_admin_report_excel(curr_user_mat, role):
                     with open(os.path.join(base_d, "backend.log"), "a") as flog: flog.write(f"\nError loading template: {ex_open}\n")
                     wb = openpyxl.Workbook() # Fallback if template missing
 
+                all_holidays = get_all_holidays()
                 month_names = ["JAN", "FEV", "MAR", "ABR", "MAIO", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"]
                 
                 for m_idx, m_name in enumerate(month_names):
@@ -2043,6 +2238,20 @@ def get_admin_report_excel(curr_user_mat, role):
                         for d_idx in range(1, num_days + 1):
                             row_idx = 13 + d_idx
                             d_key_str = f"{m_year}-{m_num:02d}-{d_idx:02d}"
+                            
+                            # Holiday logic
+                            current_date = datetime.date(m_year, m_num, d_idx)
+                            is_weekend = current_date.weekday() >= 5
+                            is_holiday = False
+                            if is_weekend:
+                                is_holiday = True
+                            elif current_date.strftime('%m-%d') in all_holidays:
+                                is_holiday = True
+                            elif d_key_str in all_holidays:
+                                is_holiday = True
+                                
+                            ws.cell(row=row_idx, column=1, value='F' if is_holiday else 'U')
+                            
                             punches = month_data["days"].get(d_key_str, [])
                             
                             has_atestado = False
