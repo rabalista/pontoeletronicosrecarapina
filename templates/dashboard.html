@@ -1752,11 +1752,12 @@
         async function downloadMyReport() {
             const token = localStorage.getItem('ponto_token');
             const s = document.getElementById('startDate').value;
-            const e = document.getElementById('endDate').value;
             let url = `/api/user/report`;
             const params = [];
-            if (s) params.push(`start_date=${s}`);
-            if (e) params.push(`end_date=${e}`);
+            if (s) {
+                const year = s.split('-')[0];
+                params.push(`year=${year}`);
+            }
             if (params.length) url += `?${params.join('&')}`;
             try {
                 if (window.API_READY) await window.API_READY;

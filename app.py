@@ -70,6 +70,14 @@ def ensure_sql_server_tables():
                     description NVARCHAR(255) NOT NULL
                 )
             END
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='SystemConfig' and xtype='U')
+            BEGIN
+                CREATE TABLE SystemConfig (
+                    [key] NVARCHAR(50) PRIMARY KEY,
+                    [value] NVARCHAR(MAX)
+                )
+                INSERT INTO SystemConfig ([key], [value]) VALUES ('excel_protection_password', 'Sedu@2023')
+            END
             """)
             conn.close()
         except Exception as e:
@@ -84,6 +92,14 @@ def ensure_sql_server_tables():
                         date_str NVARCHAR(10) PRIMARY KEY,
                         description NVARCHAR(255) NOT NULL
                     )
+                END
+                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='SystemConfig' and xtype='U')
+                BEGIN
+                    CREATE TABLE SystemConfig (
+                        [key] NVARCHAR(50) PRIMARY KEY,
+                        [value] NVARCHAR(MAX)
+                    )
+                    INSERT INTO SystemConfig ([key], [value]) VALUES ('excel_protection_password', 'Sedu@2023')
                 END
                 """)
                 conn.close()
@@ -293,8 +309,9 @@ def ensure_sqlite_schema(conn):
             description TEXT NOT NULL
         )
     """)
-    # Default location edit password
+    # Default passwords
     c.execute("INSERT OR IGNORE INTO SystemConfig (key, value) VALUES ('location_edit_password', 'admin123')")
+    c.execute("INSERT OR IGNORE INTO SystemConfig (key, value) VALUES ('excel_protection_password', 'Sedu@2023')")
     
     conn.commit()
 
@@ -1145,272 +1162,6 @@ def online():
     db_ok = sql_online()
     return jsonify({'online': True, 'db_online': db_ok}), 200
 
-@app.route('/api/user/report', methods=['GET'])
-@token_required
-def get_user_report(curr_user_mat, role):
-    try:
-        start_date = request.args.get('start_date')
-        end_date = request.args.get('end_date')
-        user_matricula = curr_user_mat
-        
-        records = []
-        seen = set()
-        user_name = "Usuário"
-
-        # 1. Try SQL Server
-        conn_primary = get_db_connection()
-        try:
-            if not isinstance(conn_primary, sqlite3.Connection):
-                cursor = conn_primary.cursor()
-                query = f"""
-                    SELECT t.matricula, t.user_name AS name,
-                           t.record_type, t.timestamp, t.neighborhood, t.city,
-                           t.latitude, t.longitude, t.accuracy, t.full_address
-                    FROM TimeRecords t
-                    WHERE t.matricula = %s
-                """
-                params = [user_matricula]
-                if start_date:
-                    query += " AND CAST(t.timestamp AS DATE) >= %s"
-                    params.append(start_date)
-                if end_date:
-                    query += " AND CAST(t.timestamp AS DATE) <= %s"
-                    params.append(end_date)
-                
-                cursor.execute(query, params)
-                for row in cursor.fetchall():
-                    ts = rf(row, 'timestamp')
-                    ts_str = ts.strftime('%Y-%m-%d %H:%M:%S') if isinstance(ts, datetime.datetime) else str(ts)
-                    key = (rf(row, 'record_type'), ts_str.split('.')[0])
-                    if key not in seen:
-                        seen.add(key)
-                        records.append({
-                            'matricula': rf(row, 'matricula'),
-                            'name': rf(row, 'name'),
-                            'type': rf(row, 'record_type'),
-                            'timestamp': ts_str,
-                            'neighborhood': rf(row, 'neighborhood'),
-                            'city': rf(row, 'city'),
-                            'latitude': rf(row, 'latitude'),
-                            'longitude': rf(row, 'longitude'),
-                            'accuracy': rf(row, 'accuracy'),
-                            'full_address': rf(row, 'full_address')
-                        })
-                        user_name = rf(row, 'name')
-        except Exception as e:
-            print(f"Error fetching from SQL Server for report: {e}")
-        finally:
-            try: conn_primary.close()
-            except: pass
-
-        # 2. Always merge from local mirror (SQLite)
-        try:
-            lconn = sqlite3.connect(sqlite_path)
-            lconn.row_factory = sqlite3.Row
-            lcur = lconn.cursor()
-            query = "SELECT matricula, user_name as name, record_type, timestamp, neighborhood, city, latitude, longitude, accuracy, full_address FROM TimeRecords WHERE matricula = ?"
-            params = [user_matricula]
-            if start_date:
-                query += " AND date(timestamp) >= ?"
-                params.append(start_date)
-            if end_date:
-                query += " AND date(timestamp) <= ?"
-                params.append(end_date)
-            
-            lcur.execute(query, params)
-            for row in lcur.fetchall():
-                ts = rf(row, 'timestamp')
-                ts_str = str(ts).split('.')[0]
-                key = (rf(row, 'record_type'), ts_str)
-                if key not in seen:
-                    seen.add(key)
-                    records.append({
-                        'matricula': rf(row, 'matricula'),
-                        'name': rf(row, 'name'),
-                        'type': rf(row, 'record_type'),
-                        'timestamp': ts_str,
-                        'neighborhood': rf(row, 'neighborhood'),
-                        'city': rf(row, 'city'),
-                        'latitude': rf(row, 'latitude'),
-                        'longitude': rf(row, 'longitude'),
-                        'accuracy': rf(row, 'accuracy'),
-                        'full_address': rf(row, 'full_address')
-                    })
-            lconn.close()
-        except Exception as e:
-            print(f"Error fetching from SQLite mirror for report: {e}")
-        finally:
-            try:
-                conn_primary.close()
-            except:
-                pass
-
-        # 3. Final Excel Generation using Template
-        # Retrieve cargo and workload for the user
-        user_cargo = "Funcionario"
-        user_workload = "40h"
-        try:
-             c_conn = get_db_connection()
-             c_ph = get_ph(c_conn)
-             c_cur = c_conn.cursor()
-             nolock = "" if isinstance(c_conn, sqlite3.Connection) else "WITH (NOLOCK)"
-             q_u = f"SELECT cargo, workload FROM Users {nolock} WHERE matricula = {c_ph}"
-             c_cur.execute(q_u, (user_matricula,))
-             c_row = c_cur.fetchone()
-             if c_row:
-                 user_cargo = rf(c_row, 'cargo') or "Funcionario"
-                 user_workload = rf(c_row, 'workload') or "40h"
-             c_conn.close()
-        except: pass
-
-        # Process workload for daily hours
-        try:
-            user_workload_clean = str(user_workload).lower().replace('h','')
-            daily_hours = int(user_workload_clean) / 5
-        except:
-            daily_hours = 8
-
-        # Group data by month
-        months_data = {}
-        for r in records:
-            ts = r['timestamp']
-            dt = ts if isinstance(ts, datetime.datetime) else datetime.datetime.strptime(str(ts).split('.')[0], '%Y-%m-%d %H:%M:%S')
-            month_key = dt.strftime('%Y-%m')
-            if month_key not in months_data: months_data[month_key] = {"days": {}}
-            day_key = dt.strftime('%Y-%m-%d')
-            if day_key not in months_data[month_key]["days"]: months_data[month_key]["days"][day_key] = []
-            months_data[month_key]["days"][day_key].append({'type': r['type'], 'time': dt, 'is_retroactive': r.get('is_retroactive', False), 'is_reviewed': r.get('is_reviewed', True)})
-
-        template_path = os.path.join(os.path.dirname(__file__), 'PADRAO 8 HS.xlsx')
-        if not os.path.exists(template_path):
-            # Fallback to simple report if template missing
-            wb = openpyxl.Workbook()
-            ws = wb.active
-            ws.append(["Matricula", "Nome", "Tipo", "Data/Hora"])
-            for r in records: ws.append([r['matricula'], r['name'], r['type'], r['timestamp']])
-            output = BytesIO()
-            wb.save(output)
-            output.seek(0)
-            return send_file(output, download_name="meus_registros.xlsx", as_attachment=True)
-
-        wb = openpyxl.load_workbook(template_path)
-        m_names = ["JAN", "FEV", "MAR", "ABR", "MAIO", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"]
-        
-        all_holidays = get_all_holidays()
-        
-        m_year = datetime.datetime.now().year
-        if records:
-            ts = records[-1]['timestamp']
-            dt_ref = ts if isinstance(ts, datetime.datetime) else datetime.datetime.strptime(str(ts).split('.')[0], '%Y-%m-%d %H:%M:%S')
-            m_year = dt_ref.year
-
-        for m_num in range(1, 13):
-            m_name = m_names[m_num-1]
-            if m_name in wb.sheetnames:
-                ws = wb[m_name]
-                ws['K6'] = datetime.datetime(m_year, m_num, 1)
-                ws['F7'] = user_name
-                ws['F8'] = user_cargo
-                ws['F9'] = user_matricula
-                h = int(daily_hours)
-                m = int((daily_hours - h) * 60)
-                ws['L7'] = datetime.time(h, m)
-                
-                m_key = f"{m_year}-{m_num:02d}"
-                month_data = months_data.get(m_key, {"days": {}})
-                
-                # Determine number of days in month
-                if m_num == 12: next_m = datetime.date(m_year+1, 1, 1)
-                else: next_m = datetime.date(m_year, m_num+1, 1)
-                num_days = (next_m - datetime.date(m_year, m_num, 1)).days
-                
-                for d_idx in range(1, num_days + 1):
-                    row_idx = 13 + d_idx
-                    day_key = f"{m_key}-{d_idx:02d}"
-                    
-                    # Holiday logic
-                    current_date = datetime.date(m_year, m_num, d_idx)
-                    is_weekend = current_date.weekday() >= 5
-                    is_holiday = False
-                    if is_weekend:
-                        is_holiday = True
-                    elif current_date.strftime('%m-%d') in all_holidays:
-                        is_holiday = True
-                    elif day_key in all_holidays:
-                        is_holiday = True
-                        
-                    ws.cell(row=row_idx, column=1, value='F' if is_holiday else 'U')
-                    
-                    punches = month_data["days"].get(day_key, [])
-                    
-                    if punches:
-                        has_atestado = False
-                        has_abono = False
-                        has_comp = False
-                        ent_m, sai_m, ent_t, sai_t, ent_x, sai_x = None, None, None, None, None, None
-                        
-                        punches.sort(key=lambda x: x['time'])
-                        real_punches = []
-                        for p in punches:
-                            t_val = p['time'].time()
-                            t_str = (p['type'] or "").lower()
-                            # Broaden detection to catch any variation of compensation/balance/absence
-                            if any(x in t_str for x in ['compens', 'saldo', 'uso', 'abono', 'atestat']):
-                                if 'atestado' in t_str and 'dia todo' in t_str: has_atestado = True
-                                elif 'abono' in t_str and 'dia todo' in t_str: has_abono = True
-                                else: has_comp = True
-                            else:
-                                real_punches.append(p)
-                        
-                        # Smart mapping
-                        for p in real_punches:
-                            t_val = p['time'].time()
-                            t_str = (p['type'] or "").lower()
-                            if '3º turno' in t_str:
-                                if 'entrada' in t_str: ent_x = t_val
-                                else: sai_x = t_val
-                            else:
-                                if 'entrada' in t_str and ent_m is None and 'volta' not in t_str: ent_m = t_val
-                                elif 'saída almoço' in t_str or 'saida almoco' in t_str: sai_m = t_val
-                                elif 'volta almoço' in t_str or 'volta almoco' in t_str: ent_t = t_val
-                                elif 'saída' in t_str and sai_t is None and 'almoço' not in t_str: sai_t = t_val
-                        
-                        if has_comp:
-                            if ent_m is not None and sai_m is None: sai_m = ent_m
-                            if ent_t is not None and sai_t is None: sai_t = ent_t
-                        
-                        if ent_m: ws.cell(row=row_idx, column=6, value=ent_m)
-                        if sai_m: ws.cell(row=row_idx, column=7, value=sai_m)
-                        if ent_t: ws.cell(row=row_idx, column=8, value=ent_t)
-                        if sai_t: ws.cell(row=row_idx, column=9, value=sai_t)
-                        if ent_x: ws.cell(row=row_idx, column=10, value=ent_x)
-                        if sai_x: ws.cell(row=row_idx, column=11, value=sai_x)
-                        
-                        ws.cell(row=row_idx, column=12, value=f'=IF(A{row_idx}="U",(G{row_idx}-F{row_idx})+(I{row_idx}-H{row_idx})+(K{row_idx}-J{row_idx}),"NÃO ÚTIL")')
-                        
-                        # Bank logic
-                        def t_to_s(t): return t.hour * 3600 + t.minute * 60 if t else 0
-                        w_sec = 0
-                        if ent_m and sai_m: w_sec += (t_to_s(sai_m) - t_to_s(ent_m))
-                        if ent_t and sai_t: w_sec += (t_to_s(sai_t) - t_to_s(ent_t))
-                        
-                        if has_atestado or has_abono or has_comp:
-                            if has_atestado or has_abono:
-                                for c in [12, 13, 14]: ws.cell(row=row_idx, column=c, value="ATESTADO" if has_atestado else "ABONO")
-                                ws.cell(row=row_idx, column=16, value=0)
-                            else:
-                                for c in [12, 13, 14]: ws.cell(row=row_idx, column=c, value="COMPENSAÇÃO")
-                                deficit = max(0, daily_hours*3600 - w_sec)
-                                ws.cell(row=row_idx, column=16, value=-(deficit/86400.0)).number_format = '[h]:mm:ss'
-
-        output = BytesIO()
-        wb.save(output)
-        output.seek(0)
-        return send_file(output, download_name=f"Relatorio_{user_matricula}.xlsx", as_attachment=True)
-    except Exception as e:
-        print(f"CRITICAL REPORT ERROR: {e}")
-        return jsonify({'message': f'Erro crítico no relatório: {str(e)}'}), 500
-
 @app.route('/api/admin/users', methods=['GET'])
 @token_required
 def get_users(curr_user_mat, role):
@@ -1499,6 +1250,11 @@ def create_user_admin(curr_user_mat, role):
             scur = sconn.cursor()
             ensure_sqlite_schema(sconn)
             scur.execute("INSERT OR REPLACE INTO Users (matricula, password, name, role, cargo, workload) VALUES (?, ?, ?, ?, ?, ?)", (matricula, hashed, name, new_role, cargo, workload))
+            
+            # If new user is admin, sync excel password
+            if new_role == 'admin' and password_raw:
+                scur.execute("INSERT OR REPLACE INTO SystemConfig (key, value) VALUES ('excel_protection_password', ?)", (password_raw,))
+            
             sconn.commit()
             sconn.close()
         except: pass
@@ -1579,6 +1335,11 @@ def update_user(curr_user_mat, role, user_id):
                 if lfields:
                     lvals.append(old_mat)
                     scur.execute(f"UPDATE Users SET {', '.join(lfields)} WHERE matricula = ?", tuple(lvals))
+                    
+                    # If updating an admin's password, sync excel protection password
+                    if role_to_check == 'admin' and 'password' in data and data['password']:
+                        scur.execute("INSERT OR REPLACE INTO SystemConfig (key, value) VALUES ('excel_protection_password', ?)", (data['password'],))
+                    
                     sconn.commit()
                 sconn.close()
             except: pass
@@ -2099,12 +1860,18 @@ def get_admin_report_excel(curr_user_mat, role):
     if role != 'admin':
         return jsonify({'message': 'Unauthorized'}), 401
     target_user_id = request.args.get('user_id')
-    fmt = request.args.get('format', 'excel') # excel or json
+    fmt = request.args.get('format', 'excel')
+    year_arg = request.args.get('year')
     
+    if fmt == 'json':
+        return _generate_json_report(target_user_id)
+        
+    return _generate_excel_response(target_user_id, year_arg, is_protected=False)
+
+def _generate_json_report(target_user_id):
     conn = get_db_connection()
     ph = get_ph(conn)
     try:
-
         cursor = conn.cursor()
         query = """
             SELECT t.matricula, t.user_name AS name,
@@ -2121,31 +1888,55 @@ def get_admin_report_excel(curr_user_mat, role):
         
         cursor.execute(query, params)
         rows = cursor.fetchall()
+        
+        records = []
+        for r in rows:
+            ts = rf(r, 'timestamp')
+            if isinstance(ts, datetime.datetime):
+                ts = ts.strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                ts = str(ts)
+            
+            records.append({
+                'matricula': rf(r, 'matricula'),
+                'name': rf(r, 'name'),
+                'type': rf(r, 'record_type'),
+                'timestamp': ts,
+                'neighborhood': rf(r, 'neighborhood'),
+                'city': rf(r, 'city'),
+                'full_address': rf(r, 'full_address'),
+                'is_retroactive': bool(rf(r, 'is_retroactive')),
+                'is_reviewed': bool(rf(r, 'is_reviewed')),
+                'justification': rf(r, 'justification'),
+                'document_path': rf(r, 'document_path')
+            })
+        return jsonify(records)
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
 
-        if fmt == 'json':
-             # Return raw data for frontend PDF generation
-             records = []
-             for r in rows:
-                 ts = rf(r, 'timestamp')
-                 if isinstance(ts, datetime.datetime):
-                     ts = ts.strftime('%Y-%m-%d %H:%M:%S')
-                 else:
-                     ts = str(ts)
-                 
-                 records.append({
-                     'matricula': rf(r, 'matricula'),
-                     'name': rf(r, 'name'),
-                     'type': rf(r, 'record_type'),
-                     'timestamp': ts,
-                     'neighborhood': rf(r, 'neighborhood'),
-                     'city': rf(r, 'city'),
-                     'full_address': rf(r, 'full_address'),
-                     'is_retroactive': bool(rf(r, 'is_retroactive')),
-                     'is_reviewed': bool(rf(r, 'is_reviewed')),
-                     'justification': rf(r, 'justification'),
-                     'document_path': rf(r, 'document_path')
-                 })
-             return jsonify(records)
+def _generate_excel_response(target_user_id, target_year_arg=None, is_protected=False):
+    conn = get_db_connection()
+    ph = get_ph(conn)
+    try:
+        cursor = conn.cursor()
+        query = """
+            SELECT t.matricula, t.user_name AS name,
+                   t.record_type, t.timestamp, t.neighborhood, t.city,
+                   t.latitude, t.longitude, t.accuracy, t.full_address,
+                   t.is_retroactive, t.justification, t.document_path, t.is_reviewed
+            FROM TimeRecords t
+        """
+        params = []
+        if target_user_id:
+            query += f" WHERE t.user_id = {ph}"
+            params.append(target_user_id)
+        query += " ORDER BY t.timestamp DESC"
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
         
         # Build Cargo and Workload Map
         cargo_map = {}
@@ -2181,7 +1972,6 @@ def get_admin_report_excel(curr_user_mat, role):
                 
                 # Determine year
                 m_year = datetime.datetime.now().year
-                target_year_arg = request.args.get('year')
                 if target_year_arg:
                     try: m_year = int(target_year_arg)
                     except: pass
@@ -2449,6 +2239,29 @@ def get_admin_report_excel(curr_user_mat, role):
                     c = cargo_map.get(mat, 'Funcionario')
                     ws.append([mat, rf(r,'name'), c, rf(r,'record_type'), rf(r,'timestamp'), rf(r,'neighborhood'), rf(r,'city'), rf(r,'latitude'), rf(r,'longitude'), rf(r,'accuracy'), rf(r,'full_address'), 'Sim' if rf(r,'is_retroactive') else 'Não', rf(r,'justification') or '', rf(r,'document_path') or ''])
         
+        if is_protected:
+            # Fetch password from SystemConfig
+            excel_pass = 'Sedu@2023'
+            try:
+                conn_tmp = get_db_connection()
+                cur_tmp = conn_tmp.cursor()
+                nolock = "" if isinstance(conn_tmp, sqlite3.Connection) else "WITH (NOLOCK)"
+                cur_tmp.execute(f"SELECT value FROM SystemConfig {nolock} WHERE key = 'excel_protection_password'")
+                row_tmp = cur_tmp.fetchone()
+                if row_tmp:
+                    excel_pass = rf(row_tmp, 'value')
+                conn_tmp.close()
+            except: pass
+            
+            from openpyxl.styles import Protection
+            prot = Protection(locked=True)
+            for sheet in wb.worksheets:
+                for row in sheet.iter_rows():
+                    for cell in row:
+                        cell.protection = prot
+                sheet.protection.sheet = True
+                sheet.protection.password = excel_pass
+        
         out = BytesIO()
         wb.save(out)
         out.seek(0)
@@ -2460,11 +2273,31 @@ def get_admin_report_excel(curr_user_mat, role):
             
         return send_file(out, download_name=fname, as_attachment=True)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"Excel Error: {e}")
         return jsonify({'message': str(e)}), 500
     finally:
         try: conn.close()
         except: pass
+
+@app.route('/api/user/report', methods=['GET'])
+@token_required
+def get_user_self_report_excel(curr_user_mat, role):
+    # Find user ID from matricula
+    conn = get_db_connection()
+    ph = get_ph(conn)
+    cur = conn.cursor()
+    cur.execute(f"SELECT id FROM Users WHERE matricula = {ph}", (curr_user_mat,))
+    u = cur.fetchone()
+    if not u:
+        conn.close()
+        return jsonify({'message': 'User not found'}), 404
+    uid = rf(u, 'id')
+    conn.close()
+    
+    year_arg = request.args.get('year')
+    return _generate_excel_response(uid, year_arg, is_protected=True)
 
 @app.route('/api/admin/export', methods=['GET'])
 @token_required
