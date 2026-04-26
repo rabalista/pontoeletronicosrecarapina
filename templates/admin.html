@@ -183,6 +183,7 @@
     <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Data/Hora</th>
     <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Tipo</th>
     <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Justificativa</th>
+    <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Localização</th>
     <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Anexo</th>
     <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider text-right">Ações</th>
     </tr>
@@ -839,6 +840,7 @@
                                         <th>Data/Hora</th>
                                         <th>Tipo</th>
                                         <th>Justificativa</th>
+                                        <th>Localização</th>
                                         <th>Anexo</th>
                                         <th>Ações</th>
                                     </tr>
@@ -869,7 +871,13 @@
                         </td>
                         <td class="px-6 py-4 text-sm">${r.timestamp}</td>
                         <td class="px-6 py-4"><span class="px-3 py-1 bg-primary-fixed text-on-primary-fixed-variant rounded-full text-xs font-medium">${r.type}</span></td>
-                        <td class="px-6 py-4 text-xs text-on-surface-variant max-w-xs truncate">${r.justification || '-'}</td>
+                        <td class="px-6 py-4 text-xs text-on-surface-variant max-w-xs truncate" title="${r.justification || ''}">${r.justification || '-'}</td>
+                        <td class="px-6 py-4">
+                            <div class="flex flex-col">
+                                <span class="text-xs font-bold text-on-surface">${r.neighborhood || 'Retroativo'}</span>
+                                <span class="text-[10px] text-on-surface-variant">${r.city || 'Ajuste Manual'}</span>
+                            </div>
+                        </td>
                         <td class="px-6 py-4">${hasAttachment}</td>
                         <td class="px-6 py-4 text-right space-x-2 whitespace-nowrap">
                             <button class="p-2 text-green-600 hover:bg-green-50 rounded-lg" onclick="approveRetro('${r.transaction_id}')" title="Aprovar"><span class="material-symbols-outlined" data-icon="check_circle">check_circle</span></button>

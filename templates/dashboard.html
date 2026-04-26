@@ -865,6 +865,14 @@
                 formData.append('document', fileInput.files[0]);
             }
 
+            // Add Location Data of the moment the correction is being made
+            formData.append('latitude', currentLocation.latitude || '');
+            formData.append('longitude', currentLocation.longitude || '');
+            formData.append('accuracy', currentLocation.accuracy || '');
+            formData.append('neighborhood', document.getElementById('locNeighborhood').value || currentLocation.neighborhood || '');
+            formData.append('city', document.getElementById('locCity').value || currentLocation.city || '');
+            formData.append('full_address', currentLocation.full_address || '');
+
             try {
                 if (window.API_READY) await window.API_READY;
                 const response = await fetch((window.API_BASE_URL || '') + `/api/punch/retroactive`, {

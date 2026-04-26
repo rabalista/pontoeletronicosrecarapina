@@ -882,6 +882,14 @@ def punch_retroactive(curr_user_mat, role):
 
     transaction_id = 'retro_' + str(int(time.time() * 1000)) + str(curr_user_mat)
 
+    # Location data from form
+    lat = request.form.get('latitude')
+    lon = request.form.get('longitude')
+    acc = request.form.get('accuracy')
+    neighborhood = request.form.get('neighborhood') or "Retroativo"
+    city = request.form.get('city') or "Justificativa Manual"
+    full_address = request.form.get('full_address') or "Ajuste Manual"
+
     # Identifiers
     user_matricula = curr_user_mat
     sql_user_id, user_name = get_user_info_by_matricula(user_matricula, conn)
@@ -919,11 +927,11 @@ def punch_retroactive(curr_user_mat, role):
             query = f"""
                 INSERT INTO TimeRecords 
                 (user_id, matricula, record_type, timestamp, latitude, longitude, accuracy, neighborhood, city, full_address, user_name, transaction_id, cargo, is_retroactive, justification, document_path) 
-                VALUES ({ph}, {ph}, {ph}, {ph}, NULL, NULL, NULL, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, 1, {ph}, {ph})
+                VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, 1, {ph}, {ph})
             """
             cursor.execute(query, (
                 sync_user_id, user_matricula, record_type, current_time, 
-                "Retroativo", "Justificativa Manual", "Ajuste Manual",
+                lat, lon, acc, neighborhood, city, full_address,
                 user_name, transaction_id, user_cargo, justification, document_path
             ))
             inserted_online = True
@@ -933,9 +941,9 @@ def punch_retroactive(curr_user_mat, role):
                     qconn = sqlite3.connect(sqlite_path); qconn.row_factory = sqlite3.Row; ensure_sqlite_schema(qconn)
                     qconn.execute("""
                         INSERT OR IGNORE INTO TimeRecords 
-                        (user_id, matricula, user_name, record_type, neighborhood, city, full_address, timestamp, transaction_id, cargo, is_retroactive, justification, document_path) 
-                        VALUES (?, ?, ?, ?, 'Retroativo', 'Justificativa Manual', 'Ajuste Manual', ?, ?, ?, 1, ?, ?)
-                    """, (sync_user_id, user_matricula, user_name, record_type, current_time, transaction_id, user_cargo, justification, document_path))
+                        (user_id, matricula, user_name, record_type, neighborhood, city, latitude, longitude, accuracy, full_address, timestamp, transaction_id, cargo, is_retroactive, justification, document_path) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                    """, (sync_user_id, user_matricula, user_name, record_type, neighborhood, city, lat, lon, acc, full_address, current_time, transaction_id, user_cargo, justification, document_path))
                     qconn.commit()
                     qconn.close()
                 except: pass
@@ -947,8 +955,8 @@ def punch_retroactive(curr_user_mat, role):
             sconn = sqlite3.connect(sqlite_path)
             ensure_sqlite_schema(sconn)
             scur = sconn.cursor()
-            scur.execute("INSERT OR IGNORE INTO OfflineQueue (matricula, record_type, timestamp, neighborhood, city, full_address, transaction_id, cargo, is_retroactive, justification, document_path) VALUES (?, ?, ?, 'Retroativo', 'Justificativa Manual', 'Ajuste Manual', ?, ?, 1, ?, ?)", 
-                         (user_matricula, record_type, current_time, transaction_id, user_cargo, justification, document_path))
+            scur.execute("INSERT OR IGNORE INTO OfflineQueue (matricula, record_type, timestamp, neighborhood, city, latitude, longitude, accuracy, full_address, transaction_id, cargo, is_retroactive, justification, document_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)", 
+                         (user_matricula, record_type, current_time, neighborhood, city, lat, lon, acc, full_address, transaction_id, user_cargo, justification, document_path))
             sconn.commit()
             sconn.close()
         except Exception as e:
