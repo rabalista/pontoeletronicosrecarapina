@@ -1809,8 +1809,8 @@
             if (daysRemaining <= 3) {
                 if (!sessionStorage.getItem('monthAlertShown')) {
                     const msg = daysRemaining === 0
-                        ? `ATENÇÃO: Hoje é o ÚLTIMO DIA do mês!\n\nPor favor, exporte seus registros clicando em 'Baixar Excel' AGORA.\nA partir de amanhã, sua lista de registros começará do zero para o novo mês.`
-                        : `Atenção: Faltam apenas ${daysRemaining} dia(s) para o fim do mês.\n\nPor favor, exporte seus registros clicando em 'Baixar Excel'.\nOs dados sumirão da sua visualização no dia 1º.`;
+                        ? `ATENÇÃO: Hoje é o ÚLTIMO DIA do mês!\n\nSua lista de registros na tela será reiniciada amanhã, mas não se preocupe: você terá até o 5º dia útil para baixar o relatório E-DOCS deste mês através do botão que aparecerá no topo da tela.`
+                        : `Atenção: Faltam apenas ${daysRemaining} dia(s) para o fim do mês.\n\nSua lista de registros na tela será reiniciada no dia 1º, mas não se preocupe: você terá até o 5º dia útil do mês seguinte para baixar o relatório E-DOCS deste mês através do botão que aparecerá no topo da tela.`;
                     alert(msg);
                     sessionStorage.setItem('monthAlertShown', 'true');
                 }
