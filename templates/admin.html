@@ -1384,7 +1384,6 @@
                     const formatTime = (match) => {
                         if (!match || (match.is_retroactive && !match.is_reviewed)) return "";
                         let time = match.timestamp.split(' ')[1].substring(0, 5);
-                        if (match.is_retroactive) time += "*";
                         return time;
                     };
 
