@@ -1487,18 +1487,10 @@
             }
 
             doc.setFontSize(8);
-            var sign1 = new jsPDF.AcroForm.TextField();
-            sign1.Rect = [20, finalY, 80, 5];
-            sign1.value = userName.toUpperCase();
-            sign1.textAlign = 'center';
-            doc.addField(sign1);
+            doc.text(userName.toUpperCase(), 60, finalY + 4, { align: 'center' });
             doc.text("(assinado eletronicamente)", 60, finalY + 8, { align: 'center' });
             
-            var sign2 = new jsPDF.AcroForm.TextField();
-            sign2.Rect = [110, finalY, 80, 5];
-            sign2.value = superintendentName;
-            sign2.textAlign = 'center';
-            doc.addField(sign2);
+            doc.text(superintendentName, 150, finalY + 4, { align: 'center' });
             doc.text("(assinado eletronicamente)", 150, finalY + 8, { align: 'center' });
 
             doc.save(`edocs - ${userName} - frequencia ${monthStr}-${yearStr}.pdf`);
