@@ -1220,6 +1220,15 @@
             const token = localStorage.getItem('ponto_token');
 
             try {
+                let superintendentName = "TIAGO GUERCON DA SILVA";
+                try {
+                    const confRes = await fetch('/api/config/public');
+                    if (confRes.ok) {
+                        const cData = await confRes.json();
+                        if (cData.superintendent_name) superintendentName = cData.superintendent_name;
+                    }
+                } catch(e) {}
+
                 // 1. Get User Details
                 let user = null;
                 if (window.allUsers) {
@@ -1501,7 +1510,7 @@
                 doc.text(userName.toUpperCase(), 60, finalY + 4, { align: 'center' });
                 doc.text("(assinado eletronicamente)", 60, finalY + 8, { align: 'center' });
                 
-                doc.text((window.superintendentName || localStorage.getItem('user_name') || "ADMINISTRADOR").toUpperCase(), 150, finalY + 4, { align: 'center' });
+                doc.text(superintendentName, 150, finalY + 4, { align: 'center' });
                 doc.text("(assinado eletronicamente)", 150, finalY + 8, { align: 'center' });
 
                 doc.save(`edocs - ${userName} - frequencia ${monthStr}-${yearStr}.pdf`);
