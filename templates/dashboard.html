@@ -1772,7 +1772,8 @@
                     const downloadUrl = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = downloadUrl;
-                    a.download = 'meus_registros.xlsx';
+                    const uName = localStorage.getItem('user_name') || 'Usuario';
+                    a.download = `Ponto - ${uName}.xlsx`;
                     document.body.appendChild(a);
                     a.click();
                     a.remove();

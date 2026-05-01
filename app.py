@@ -2103,28 +2103,34 @@ def _generate_excel_response(target_user_id, target_year_arg=None, is_protected=
                                 standard_punches = [p for p in final_punches if '3º turno' not in (p['type'] or "").lower()]
                                 extra_punches = [p for p in final_punches if '3º turno' in (p['type'] or "").lower()]
                                 
+                                assigned_indices = set()
                                 # Smart assignment for standard punches: prioritize by record type
-                                for p in standard_punches:
+                                for i, p in enumerate(standard_punches):
                                     t_val = p['time'].time() if isinstance(p['time'], datetime.datetime) else None
                                     t_str = (p['type'] or "").lower()
                                     
                                     # Map specific types to slots if they are empty
                                     if 'entrada' in t_str and ent_m is None and 'extra' not in t_str and 'volta' not in t_str:
                                         ent_m = t_val
+                                        assigned_indices.add(i)
                                     elif ('saída almoço' in t_str or 'saida almoco' in t_str) and sai_m is None:
                                         sai_m = t_val
+                                        assigned_indices.add(i)
                                     elif ('volta almoço' in t_str or 'volta almoco' in t_str) and ent_t is None:
                                         ent_t = t_val
+                                        assigned_indices.add(i)
                                     elif 'saída' in t_str and sai_t is None and 'extra' not in t_str and 'almoço' not in t_str and 'almoco' not in t_str:
                                         sai_t = t_val
+                                        assigned_indices.add(i)
 
-                                # Fallback to sequential assignment for any remaining empty slots (using first 4)
-                                for i, p in enumerate(standard_punches[:4]):
+                                # Fallback to sequential assignment for any remaining empty slots
+                                unassigned_punches = [p for i, p in enumerate(standard_punches) if i not in assigned_indices]
+                                for p in unassigned_punches:
                                     t_val = p['time'].time() if isinstance(p['time'], datetime.datetime) else None
-                                    if i == 0 and ent_m is None: ent_m = t_val
-                                    elif i == 1 and sai_m is None: sai_m = t_val
-                                    elif i == 2 and ent_t is None: ent_t = t_val
-                                    elif i == 3 and sai_t is None: sai_t = t_val
+                                    if ent_m is None: ent_m = t_val
+                                    elif sai_m is None: sai_m = t_val
+                                    elif ent_t is None: ent_t = t_val
+                                    elif sai_t is None: sai_t = t_val
                                 
                                 # Assignment for extra punches (bank/doctor absence)
                                 for p in extra_punches:
@@ -2142,13 +2148,13 @@ def _generate_excel_response(target_user_id, target_year_arg=None, is_protected=
                                 if ent_t is not None and sai_t is None: sai_t = ent_t
                                 if ent_x is not None and sai_x is None: sai_x = ent_x
 
-                            # Always write the times if they exist
-                            if ent_m is not None: ws.cell(row=row_idx, column=6, value=ent_m).number_format = 'hh:mm:ss'
-                            if sai_m is not None: ws.cell(row=row_idx, column=7, value=sai_m).number_format = 'hh:mm:ss'
-                            if ent_t is not None: ws.cell(row=row_idx, column=8, value=ent_t).number_format = 'hh:mm:ss'
-                            if sai_t is not None: ws.cell(row=row_idx, column=9, value=sai_t).number_format = 'hh:mm:ss'
-                            if ent_x is not None: ws.cell(row=row_idx, column=10, value=ent_x).number_format = 'hh:mm:ss'
-                            if sai_x is not None: ws.cell(row=row_idx, column=11, value=sai_x).number_format = 'hh:mm:ss'
+                            # Always write the times if they exist, otherwise clear the cell
+                            ws.cell(row=row_idx, column=6, value=ent_m if ent_m is not None else "").number_format = 'hh:mm:ss'
+                            ws.cell(row=row_idx, column=7, value=sai_m if sai_m is not None else "").number_format = 'hh:mm:ss'
+                            ws.cell(row=row_idx, column=8, value=ent_t if ent_t is not None else "").number_format = 'hh:mm:ss'
+                            ws.cell(row=row_idx, column=9, value=sai_t if sai_t is not None else "").number_format = 'hh:mm:ss'
+                            ws.cell(row=row_idx, column=10, value=ent_x if ent_x is not None else "").number_format = 'hh:mm:ss'
+                            ws.cell(row=row_idx, column=11, value=sai_x if sai_x is not None else "").number_format = 'hh:mm:ss'
                             
                             # Overwrite formula in L to SUBTRACT the extra shift (absence)
                             # Formula in L matching template intent (G-F + I-H + K-J)
