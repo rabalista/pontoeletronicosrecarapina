@@ -1624,10 +1624,15 @@ def get_public_config():
         cur = conn.cursor()
         cur.execute("SELECT value FROM SystemConfig WHERE key = 'superintendent_name'")
         row = cur.fetchone()
+        cur.execute("SELECT value FROM SystemConfig WHERE key = 'custom_notification'")
+        notif_row = cur.fetchone()
         conn.close()
-        return jsonify({'superintendent_name': row[0] if row else 'TIAGO GUERCON DA SILVA'})
+        return jsonify({
+            'superintendent_name': row[0] if row else 'TIAGO GUERCON DA SILVA',
+            'custom_notification': notif_row[0] if notif_row else ''
+        })
     except Exception as e:
-        return jsonify({'superintendent_name': 'TIAGO GUERCON DA SILVA'})
+        return jsonify({'superintendent_name': 'TIAGO GUERCON DA SILVA', 'custom_notification': ''})
 
 @app.route('/api/admin/config', methods=['GET'])
 @token_required

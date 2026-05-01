@@ -153,7 +153,13 @@
 </div>
 <div class="absolute right-8 top-12 flex items-center gap-6">
     <div class="flex items-center gap-4">
+        <button class="hidden md:flex text-on-surface-variant hover:text-primary relative p-2 rounded-full hover:bg-white/50 transition-colors" onclick="openNotifModal()" title="Configurar Notificação do Sistema">
+            <span class="material-symbols-outlined text-2xl">notifications</span>
+        </button>
         <span class="hidden lg:block text-sm font-bold text-on-surface" id="adminName">Admin</span>
+        <button class="md:hidden text-on-surface-variant hover:text-primary relative p-2 rounded-full hover:bg-white/50 transition-colors" onclick="openNotifModal()" title="Configurar Notificação do Sistema">
+            <span class="material-symbols-outlined text-2xl">notifications</span>
+        </button>
         <button class="md:hidden text-error hover:bg-error/10 p-2 rounded-full" onclick="logout()" title="Sair"><span class="material-symbols-outlined">logout</span></button>
     </div>
 </div>
@@ -649,6 +655,10 @@
                 if (config.superintendent_name) {
                     document.getElementById('superintendentInput').value = config.superintendent_name;
                     window.superintendentName = config.superintendent_name;
+                }
+                if (config.custom_notification !== undefined) {
+                    const notifInput = document.getElementById('notifTextInput');
+                    if (notifInput) notifInput.value = config.custom_notification;
                 }
             } catch (error) {
                 console.error("Erro ao carregar configurações", error);
@@ -1529,6 +1539,59 @@
             }
         }
     </script>
+
+<!-- Notif Modal -->
+<div id="notifModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeNotifModal()"></div>
+    <div class="bg-surface-container-lowest rounded-2xl w-full max-w-md shadow-2xl overflow-hidden relative z-10 flex flex-col max-h-[90vh]">
+        <div class="p-6 border-b border-outline-variant/20 flex justify-between items-center bg-surface-container-low">
+            <h3 class="text-xl font-bold text-on-surface flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">notifications_active</span>
+                Aviso do Sininho
+            </h3>
+            <button onclick="closeNotifModal()" class="text-on-surface-variant hover:bg-white/50 p-2 rounded-full transition-colors">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <div class="p-6 overflow-y-auto space-y-4">
+            <p class="text-xs text-on-surface-variant mb-2">Este aviso aparecerá para todos os usuários na tela de login principal ao clicarem no sininho. Deixe em branco para ocultar.</p>
+            <textarea id="notifTextInput" class="w-full bg-white/50 border border-outline-variant/30 rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary/20 h-32" placeholder="Escreva a notificação aqui..."></textarea>
+        </div>
+        <div class="p-6 border-t border-outline-variant/20 bg-surface-container-low flex justify-end gap-3">
+            <button onclick="closeNotifModal()" class="px-5 py-2.5 rounded-xl font-bold text-sm bg-white/80 text-on-surface-variant hover:bg-white transition-all shadow-sm">Cancelar</button>
+            <button onclick="saveNotif()" class="px-5 py-2.5 rounded-xl font-bold text-sm bg-primary text-on-primary shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all">Salvar Aviso</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openNotifModal() {
+        document.getElementById('notifModal').classList.remove('hidden');
+    }
+    function closeNotifModal() {
+        document.getElementById('notifModal').classList.add('hidden');
+    }
+    async function saveNotif() {
+        const text = document.getElementById('notifTextInput').value.trim();
+        const token = localStorage.getItem('ponto_token');
+        try {
+            if (window.API_READY) await window.API_READY;
+            const res = await apiFetch(`/api/admin/config`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ custom_notification: text })
+            });
+            if (res.ok) {
+                alert('Aviso do sininho salvo com sucesso!');
+                closeNotifModal();
+            } else {
+                alert('Erro ao salvar aviso.');
+            }
+        } catch (e) {
+            alert('Erro de conexão ao salvar aviso.');
+        }
+    }
+</script>
 
 </body>
 </html>

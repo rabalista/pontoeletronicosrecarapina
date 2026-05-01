@@ -90,11 +90,36 @@
             border-radius: 1.25rem !important;
             box-shadow: 0 0 0 2px #98cbff !important;
         }
+        @keyframes shakeBell {
+            0%, 100% { transform: rotate(0deg); }
+            20%, 60% { transform: rotate(15deg); }
+            40%, 80% { transform: rotate(-15deg); }
+        }
+        .bell-shake {
+            animation: shakeBell 0.5s ease-in-out infinite;
+        }
     </style>
 </head>
 <body class="bg-pastel-gradient text-on-surface min-h-screen flex flex-col items-center justify-center font-body">
 
-<div id="loginScreen" class="w-full flex-grow flex flex-col items-center justify-center">
+<div id="loginScreen" class="w-full flex-grow flex flex-col items-center justify-center relative">
+    
+    <!-- Notification Bell -->
+    <div class="absolute left-4 top-4 md:left-8 md:top-8 z-40">
+        <button id="notifBell" onclick="toggleNotifPanel()" class="relative p-3 bg-surface-container-lowest rounded-full shadow-md text-primary hover:scale-110 transition-transform hidden">
+            <span class="material-symbols-outlined text-3xl">notifications</span>
+            <span id="notifBadge" class="absolute top-1 right-1 bg-error text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">1</span>
+        </button>
+        
+        <div id="notifPanel" class="hidden absolute top-14 left-0 w-72 bg-surface-container-lowest rounded-2xl shadow-xl border border-outline-variant/20 overflow-hidden transform origin-top-left transition-all">
+            <div class="bg-primary text-white p-3 font-bold text-sm flex items-center gap-2">
+                <span class="material-symbols-outlined">notifications_active</span> Avisos
+            </div>
+            <div id="notifList" class="max-h-64 overflow-y-auto flex flex-col divide-y divide-outline-variant/10">
+            </div>
+        </div>
+    </div>
+
 <main class="w-full flex-grow flex flex-col items-center justify-center px-4 py-4 max-w-[1200px]">
 <!-- Header / Logo Area -->
 <header class="flex flex-col items-center mb-4 text-center w-full max-w-[420px]">
@@ -354,6 +379,61 @@
         }
     });
     switchTab('register');
+
+    async function loadNotifications() {
+        const notifBell = document.getElementById('notifBell');
+        const notifBadge = document.getElementById('notifBadge');
+        const notifList = document.getElementById('notifList');
+        let messages = [];
+        
+        const today = new Date();
+        if (today.getDate() >= 1 && today.getDate() <= 5) {
+            messages.push("ACESSE O LOGIN DO SERVIDOR PARA IMPRIMIR O SEU E-DOCS.");
+        }
+        
+        try {
+            const confRes = await fetch('/api/config/public');
+            if (confRes.ok) {
+                const cData = await confRes.json();
+                if (cData.custom_notification && cData.custom_notification.trim() !== '') {
+                    messages.push(cData.custom_notification);
+                }
+            }
+        } catch(e) {}
+        
+        if (messages.length > 0) {
+            notifBell.classList.remove('hidden');
+            notifBadge.innerText = messages.length;
+            notifBell.querySelector('.material-symbols-outlined').classList.add('bell-shake');
+            
+            notifList.innerHTML = '';
+            messages.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = 'p-4 text-xs text-on-surface hover:bg-surface-container-low transition-colors whitespace-pre-wrap';
+                div.innerText = msg;
+                notifList.appendChild(div);
+            });
+        }
+    }
+    
+    function toggleNotifPanel() {
+        const panel = document.getElementById('notifPanel');
+        panel.classList.toggle('hidden');
+        const icon = document.getElementById('notifBell').querySelector('.material-symbols-outlined');
+        icon.classList.remove('bell-shake');
+    }
+
+    document.addEventListener('click', function(event) {
+        const panel = document.getElementById('notifPanel');
+        const bell = document.getElementById('notifBell');
+        if (panel && bell && !panel.classList.contains('hidden')) {
+            if (!panel.contains(event.target) && !bell.contains(event.target)) {
+                panel.classList.add('hidden');
+            }
+        }
+    });
+    
+    window.addEventListener('DOMContentLoaded', loadNotifications);
 </script>
 </body>
 </html>
