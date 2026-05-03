@@ -166,8 +166,19 @@
 <option value="Atestado (Dia Todo)">Atestado (Dia Todo)</option>
 <option value="Abono (Dia Todo)">Abono (Dia Todo)</option>
 <option value="Uso de Saldo/Compensação">Uso de Saldo/Compensação</option>
+<option value="Férias">Férias</option>
 </select>
 <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-lg">expand_more</span>
+</div>
+</div>
+<div id="fastDateRange" class="hidden space-y-3">
+<div class="space-y-1">
+<label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Data Inicial</label>
+<input type="date" id="fastStartDate" class="w-full bg-surface-container-high border-none rounded-[1rem] h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" />
+</div>
+<div class="space-y-1">
+<label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Data Final</label>
+<input type="date" id="fastEndDate" class="w-full bg-surface-container-high border-none rounded-[1rem] h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" />
 </div>
 </div>
 <div class="space-y-1">
@@ -346,27 +357,72 @@
             const loc = await getFastLocation();
 
             t.innerText = 'SALVANDO...';
-            const pr = await apiFetch(`/api/punch`, { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ld.token}` }, 
-                body: JSON.stringify({ 
-                    type: tp, 
-                    latitude: loc.lat, 
-                    longitude: loc.lon, 
-                    accuracy: loc.accuracy, 
-                    neighborhood: loc.neighborhood, 
-                    city: loc.city, 
-                    full_address: loc.full_address, 
-                    transaction_id: 'fast_' + Date.now() 
-                }) 
-            });
+            if (tp === 'Férias') {
+                const sDateStr = document.getElementById('fastStartDate').value;
+                const eDateStr = document.getElementById('fastEndDate').value;
+                if (!sDateStr || !eDateStr) {
+                    alert('Preencha a data inicial e final.');
+                    b.disabled = false; t.innerText = 'REGISTRAR PONTO'; ri.innerText = 'fingerprint'; ri.classList.remove('animate-spin');
+                    return;
+                }
+                const start = new Date(sDateStr + 'T00:00:00');
+                const end = new Date(eDateStr + 'T00:00:00');
+                let allOk = true;
+                for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                    const y = d.getFullYear();
+                    const mo = String(d.getMonth() + 1).padStart(2, '0');
+                    const da = String(d.getDate()).padStart(2, '0');
+                    const dtStr = `${y}-${mo}-${da}T08:00`;
+                    
+                    const fd = new FormData();
+                    fd.append('type', 'Férias');
+                    fd.append('datetime', dtStr);
+                    fd.append('justification', `Férias do período ${sDateStr} a ${eDateStr}`);
+                    fd.append('latitude', loc.lat);
+                    fd.append('longitude', loc.lon);
+                    fd.append('accuracy', loc.accuracy);
+                    fd.append('neighborhood', loc.neighborhood);
+                    fd.append('city', loc.city);
+                    fd.append('full_address', loc.full_address);
+                    
+                    const rRes = await fetch('/api/punch/retroactive', {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${ld.token}` },
+                        body: fd
+                    });
+                    if (!rRes.ok) allOk = false;
+                }
+                if (allOk) {
+                    alert(`FÉRIAS REGISTRADAS COM SUCESSO!`);
+                    document.getElementById('fastForm').reset();
+                    const rangeDiv = document.getElementById('fastDateRange');
+                    if(rangeDiv) rangeDiv.classList.add('hidden');
+                } else {
+                    alert("Erro ao registrar algumas datas das Férias.");
+                }
+            } else {
+                const pr = await apiFetch(`/api/punch`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ld.token}` }, 
+                    body: JSON.stringify({ 
+                        type: tp, 
+                        latitude: loc.lat, 
+                        longitude: loc.lon, 
+                        accuracy: loc.accuracy, 
+                        neighborhood: loc.neighborhood, 
+                        city: loc.city, 
+                        full_address: loc.full_address, 
+                        transaction_id: 'fast_' + Date.now() 
+                    }) 
+                });
 
-            if (pr.ok) { 
-                alert(`PONTO REGISTRADO EM: ${loc.neighborhood}`); 
-                document.getElementById('fastForm').reset(); 
-            } else { 
-                const err = await pr.json();
-                alert("Erro: " + (err.message || "Falha ao registrar")); 
+                if (pr.ok) { 
+                    alert(`PONTO REGISTRADO EM: ${loc.neighborhood}`); 
+                    document.getElementById('fastForm').reset(); 
+                } else { 
+                    const err = await pr.json();
+                    alert("Erro: " + (err.message || "Falha ao registrar")); 
+                }
             }
         } catch (err) { 
             console.error(err);
@@ -379,6 +435,19 @@
         }
     });
     switchTab('register');
+
+    document.getElementById('fastType').addEventListener('change', (e) => {
+        const rangeDiv = document.getElementById('fastDateRange');
+        if (e.target.value === 'Férias') {
+            rangeDiv.classList.remove('hidden');
+            document.getElementById('fastStartDate').required = true;
+            document.getElementById('fastEndDate').required = true;
+        } else {
+            rangeDiv.classList.add('hidden');
+            document.getElementById('fastStartDate').required = false;
+            document.getElementById('fastEndDate').required = false;
+        }
+    });
 
     async function loadNotifications() {
         const notifBell = document.getElementById('notifBell');

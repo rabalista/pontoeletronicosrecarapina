@@ -13,6 +13,7 @@ from functools import wraps
 import sqlite3
 from dotenv import load_dotenv
 import openpyxl
+import zipfile
 from io import BytesIO
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 import calendar
@@ -764,7 +765,7 @@ def punch(curr_user_mat, role):
              if r: user_cargo = r[0] or 'Funcionario'
     except: pass
     
-    is_retro_flag = 1 if any(word in data['type'].lower() for word in ['atestado', 'abono', 'compensação', 'compensacao', 'justificativa', 'uso de saldo']) else 0
+    is_retro_flag = 1 if any(word in data['type'].lower() for word in ['atestado', 'abono', 'férias', 'ferias', 'compensação', 'compensacao', 'justificativa', 'uso de saldo']) else 0
     justification_val = "Lançado via Registro Rápido" if is_retro_flag else None
 
     # If using SQL Server OR if we are in local VS Code mode (USE_SQLITE is true)
@@ -1930,6 +1931,279 @@ def _generate_json_report(target_user_id):
         try: conn.close()
         except: pass
 
+def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, is_protected, excel_pass):
+    try:
+        wb = openpyxl.Workbook()
+        target_mat = rf(user_records[0], 'matricula') if user_records else None
+        user_workload = workload_map.get(target_mat, '40h') or '40h'
+        try:
+            user_workload_clean = str(user_workload).lower().replace('h','')
+            daily_hours = int(user_workload_clean) / 5
+        except:
+            daily_hours = 8
+        user_cargo = cargo_map.get(target_mat, 'xxx')
+        user_name = rf(user_records[0], 'name') if user_records else "Desconhecido"
+        
+        m_year = datetime.datetime.now().year
+        if target_year_arg:
+            try: m_year = int(target_year_arg)
+            except: pass
+        elif user_records:
+            ts = rf(user_records[-1], 'timestamp')
+            if ts:
+                dtt = ts if isinstance(ts, datetime.datetime) else datetime.datetime.strptime(str(ts).split('.')[0], '%Y-%m-%d %H:%M:%S')
+                m_year = dtt.year
+            
+        months_data = {}
+        for r in user_records:
+            ts = rf(r, 'timestamp')
+            if not ts: continue
+            dt = ts if isinstance(ts, datetime.datetime) else datetime.datetime.strptime(str(ts).split('.')[0], '%Y-%m-%d %H:%M:%S')
+            if dt.year != m_year: continue 
+            month_key = dt.strftime('%Y-%m')
+            if month_key not in months_data: months_data[month_key] = {"days": {}}
+            
+            day_key = dt.strftime('%Y-%m-%d')
+            if day_key not in months_data[month_key]["days"]: months_data[month_key]["days"][day_key] = []
+            months_data[month_key]["days"][day_key].append({'type': rf(r, 'record_type'), 'time': dt, 'is_retroactive': rf(r, 'is_retroactive'), 'is_reviewed': rf(r, 'is_reviewed')})
+
+        import os, calendar
+        try:
+            base_d = os.path.abspath(os.path.dirname(__file__))
+            template_path = os.path.join(base_d, "PADRAO 8 HS.xlsx")
+            wb = openpyxl.load_workbook(template_path)
+        except Exception as ex_open:
+            with open(os.path.join(base_d, "backend.log"), "a") as flog: flog.write(f"\nError loading template: {ex_open}\n")
+            wb = openpyxl.Workbook() 
+
+        all_holidays = get_all_holidays()
+        month_names = ["JAN", "FEV", "MAR", "ABR", "MAIO", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"]
+        
+        for m_idx, m_name in enumerate(month_names):
+            m_num = m_idx + 1
+            if m_name in wb.sheetnames:
+                ws = wb[m_name]
+                ws['K6'] = datetime.datetime(m_year, m_num, 1)
+                ws['C6'] = user_name
+                ws['C7'] = user_cargo
+                ws['L10'] = target_mat
+                h = int(daily_hours)
+                m = int((daily_hours - h) * 60)
+                ws['L7'] = datetime.time(h, m)
+                ws['N9'] = m_year
+                ws['J13'] = 'entrada EXTRA'
+                ws['K13'] = 'saída EXTRA'
+                
+                m_key = f"{m_year}-{m_num:02d}"
+                month_data = months_data.get(m_key, {"days": {}})
+                num_days = calendar.monthrange(m_year, m_num)[1]
+                
+                for d_idx in range(1, num_days + 1):
+                    row_idx = 13 + d_idx
+                    d_key_str = f"{m_year}-{m_num:02d}-{d_idx:02d}"
+                    
+                    current_date = datetime.date(m_year, m_num, d_idx)
+                    is_weekend = current_date.weekday() >= 5
+                    is_holiday = False
+                    if is_weekend:
+                        is_holiday = True
+                    elif current_date.strftime('%m-%d') in all_holidays:
+                        is_holiday = True
+                    elif d_key_str in all_holidays:
+                        is_holiday = True
+                        
+                    ws.cell(row=row_idx, column=1, value='F' if is_holiday else 'U')
+                    
+                    punches = month_data["days"].get(d_key_str, [])
+                    
+                    has_atestado = False
+                    has_abono = False
+                    has_ferias = False
+                    has_comp = False
+                    ent_m, sai_m, ent_t, sai_t, ent_x, sai_x = None, None, None, None, None, None
+                    
+                    if len(punches) > 0:
+                        punches.sort(key=lambda x: x['time'])
+                        real_punches = []
+                        for p in punches:
+                            t_val = p['time'].time() if isinstance(p['time'], datetime.datetime) else None
+                            if t_val is None: continue 
+                            
+                            t_str = (p['type'] or "").lower()
+                            if any(x in t_str for x in ['compens', 'saldo', 'uso', 'abono', 'atestat', 'férias', 'ferias']):
+                                if 'atestado' in t_str and 'dia todo' in t_str:
+                                    has_atestado = True
+                                elif 'abono' in t_str and 'dia todo' in t_str:
+                                    has_abono = True
+                                elif 'férias' in t_str or 'ferias' in t_str:
+                                    has_ferias = True
+                                else:
+                                    has_comp = True
+                            else:
+                                real_punches.append(p)
+                        
+                        if has_atestado or has_abono or has_comp or has_ferias:
+                            pass 
+                        
+                        final_punches = []
+                        grouped_by_type = {}
+                        for p in real_punches:
+                            t = p['type']
+                            if t not in grouped_by_type:
+                                grouped_by_type[t] = []
+                            grouped_by_type[t].append(p)
+                        
+                        for t, pts in grouped_by_type.items():
+                            approved_retros = [p for p in pts if p.get('is_retroactive') and p.get('is_reviewed')]
+                            if approved_retros:
+                                final_punches.extend(approved_retros)
+                            else:
+                                final_punches.extend(pts)
+                        
+                        final_punches.sort(key=lambda x: x['time'])
+                        
+                        standard_punches = [p for p in final_punches if '3º turno' not in (p['type'] or "").lower()]
+                        extra_punches = [p for p in final_punches if '3º turno' in (p['type'] or "").lower()]
+                        
+                        assigned_indices = set()
+                        for i, p in enumerate(standard_punches):
+                            t_val = p['time'].time() if isinstance(p['time'], datetime.datetime) else None
+                            t_str = (p['type'] or "").lower()
+                            
+                            if 'entrada' in t_str and ent_m is None and 'extra' not in t_str and 'volta' not in t_str:
+                                ent_m = t_val
+                                assigned_indices.add(i)
+                            elif ('saída almoço' in t_str or 'saida almoco' in t_str) and sai_m is None:
+                                sai_m = t_val
+                                assigned_indices.add(i)
+                            elif ('volta almoço' in t_str or 'volta almoco' in t_str) and ent_t is None:
+                                ent_t = t_val
+                                assigned_indices.add(i)
+                            elif 'saída' in t_str and sai_t is None and 'extra' not in t_str and 'almoço' not in t_str and 'almoco' not in t_str:
+                                sai_t = t_val
+                                assigned_indices.add(i)
+
+                        unassigned_punches = [p for i, p in enumerate(standard_punches) if i not in assigned_indices]
+                        for p in unassigned_punches:
+                            t_val = p['time'].time() if isinstance(p['time'], datetime.datetime) else None
+                            if ent_m is None: ent_m = t_val
+                            elif sai_m is None: sai_m = t_val
+                            elif ent_t is None: ent_t = t_val
+                            elif sai_t is None: sai_t = t_val
+                        
+                        for p in extra_punches:
+                            t_val = p['time'].time() if isinstance(p['time'], datetime.datetime) else None
+                            t_str = (p['type'] or "").lower()
+                            if 'entrada extra' in t_str:
+                                ent_x = t_val
+                            elif 'saída extra' in t_str or 'saida extra' in t_str:
+                                sai_x = t_val
+                    
+                    if has_comp:
+                        if ent_m is not None and sai_m is None: sai_m = ent_m
+                        if ent_t is not None and sai_t is None: sai_t = ent_t
+                        if ent_x is not None and sai_x is None: sai_x = ent_x
+
+                    ws.cell(row=row_idx, column=6, value=ent_m if ent_m is not None else "").number_format = 'hh:mm:ss'
+                    ws.cell(row=row_idx, column=7, value=sai_m if sai_m is not None else "").number_format = 'hh:mm:ss'
+                    ws.cell(row=row_idx, column=8, value=ent_t if ent_t is not None else "").number_format = 'hh:mm:ss'
+                    ws.cell(row=row_idx, column=9, value=sai_t if sai_t is not None else "").number_format = 'hh:mm:ss'
+                    ws.cell(row=row_idx, column=10, value=ent_x if ent_x is not None else "").number_format = 'hh:mm:ss'
+                    ws.cell(row=row_idx, column=11, value=sai_x if sai_x is not None else "").number_format = 'hh:mm:ss'
+                    
+                    ws.cell(row=row_idx, column=12, value=f'=IF(A{row_idx}="U",(G{row_idx}-F{row_idx})+(I{row_idx}-H{row_idx})+(K{row_idx}-J{row_idx}),"NÃO ÚTIL")')
+
+                    def t_to_s(t):
+                        if t is None: return 0
+                        return t.hour * 3600 + t.minute * 60 + t.second
+                    
+                    w_sec = 0
+                    if ent_m and sai_m: w_sec += max(0, t_to_s(sai_m) - t_to_s(ent_m))
+                    if ent_t and sai_t: w_sec += max(0, t_to_s(sai_t) - t_to_s(ent_t))
+                    if ent_x and sai_x: w_sec += max(0, t_to_s(sai_x) - t_to_s(ent_x))
+                    
+                    daily_sec = daily_hours * 3600
+                    deficit_sec = max(0, daily_sec - w_sec)
+
+                    if has_atestado or has_abono or has_comp or has_ferias:
+                        if has_atestado or has_abono or has_ferias:
+                            if has_atestado: val_str = "ATESTADO"
+                            elif has_abono: val_str = "ABONO"
+                            else: val_str = "FÉRIAS"
+                            ws.cell(row=row_idx, column=12, value=val_str)
+                            ws.cell(row=row_idx, column=13, value=val_str)
+                            ws.cell(row=row_idx, column=14, value=val_str)
+                            ws.cell(row=row_idx, column=16, value=0)
+                        else:
+                            val_str = "COMPENSAÇÃO"
+                            ws.cell(row=row_idx, column=12, value=val_str)
+                            ws.cell(row=row_idx, column=13, value=val_str)
+                            ws.cell(row=row_idx, column=14, value=val_str)
+                            ws.cell(row=row_idx, column=16, value=-(deficit_sec / 86400.0)).number_format = '[h]:mm:ss'
+                        
+                TEMPLATE_CELLS = {
+                    'JAN': {'ant': 'M53', 'tot': 'M55'}, 'FEV': {'ant': 'M51', 'tot': 'M53'}, 
+                    'MAR': {'ant': 'M53', 'tot': 'M55'}, 'ABR': {'ant': 'M52', 'tot': 'M54'}, 
+                    'MAIO': {'ant': 'M53', 'tot': 'M55'}, 'JUN': {'ant': 'M52', 'tot': 'M54'}, 
+                    'JUL': {'ant': 'M53', 'tot': 'M55'}, 'AGO': {'ant': 'M53', 'tot': 'M55'}, 
+                    'SET': {'ant': 'M52', 'tot': 'M54'}, 'OUT': {'ant': 'M53', 'tot': 'M55'}, 
+                    'NOV': {'ant': 'M52', 'tot': 'M54'}, 'DEZ': {'ant': 'M53', 'tot': 'M55'}
+                }
+                if m_name in TEMPLATE_CELLS:
+                    ant_cell = TEMPLATE_CELLS[m_name]['ant']
+                    
+                    first_punch_month = None
+                    if user_records:
+                        ts_first = rf(user_records[-1], 'timestamp') 
+                        if ts_first:
+                            dt_first = ts_first if isinstance(ts_first, datetime.datetime) else datetime.datetime.strptime(str(ts_first).split('.')[0], '%Y-%m-%d %H:%M:%S')
+                            first_punch_month = datetime.date(dt_first.year, dt_first.month, 1)
+                    
+                    this_month_date = datetime.date(m_year, m_num, 1)
+                    
+                    is_before_or_start_month = False
+                    if first_punch_month and this_month_date <= first_punch_month:
+                        is_before_or_start_month = True
+                    
+                    if is_before_or_start_month:
+                        ws['Q4'] = 0
+                        ws[ant_cell] = f"=Q4"
+                        ws['Q4'].number_format = '[h]:mm:ss'
+                        ws[ant_cell].number_format = '[h]:mm:ss'
+                    else:
+                        if m_idx > 0:
+                            prev_name = month_names[m_idx - 1]
+                            prev_tot = TEMPLATE_CELLS[prev_name]['tot']
+                            ws['Q4'] = f"='{prev_name}'!{prev_tot}"
+                            ws[ant_cell] = f"=Q4"
+                        else:
+                            prev_bal_days = get_previous_years_balance(user_records, m_year, daily_hours)
+                            ws['Q4'] = prev_bal_days
+                            ws[ant_cell] = f"=Q4"
+                            ws['Q4'].number_format = '[h]:mm:ss'
+                            ws[ant_cell].number_format = '[h]:mm:ss'
+                        
+        if is_protected:
+            from openpyxl.styles import Protection
+            prot = Protection(locked=True)
+            for sheet in wb.worksheets:
+                for row in sheet.iter_rows():
+                    for cell in row:
+                        cell.protection = prot
+                sheet.protection.sheet = True
+                sheet.protection.password = excel_pass
+
+        out = BytesIO()
+        wb.save(out)
+        out.seek(0)
+        return out
+    except Exception as e_main:
+        import traceback, os
+        with open(os.path.join(os.path.abspath(os.path.dirname(__file__)), "backend.log"), "a") as flog:
+            flog.write(f"\nCRITICAL EXCEL ERROR:\n{traceback.format_exc()}\n")
+        raise e_main
+
+
 def _generate_excel_response(target_user_id, target_year_arg=None, is_protected=False):
     conn = get_db_connection()
     ph = get_ph(conn)
@@ -1951,7 +2225,6 @@ def _generate_excel_response(target_user_id, target_year_arg=None, is_protected=
         cursor.execute(query, params)
         rows = cursor.fetchall()
         
-        # Build Cargo and Workload Map
         cargo_map = {}
         workload_map = {}
         try:
@@ -1966,301 +2239,8 @@ def _generate_excel_response(target_user_id, target_year_arg=None, is_protected=
             c_conn.close()
         except: pass
 
-        wb = openpyxl.Workbook()
-        if target_user_id:
-            try:
-                user_records = list(rows)
-                user_records.reverse() # chronological
-                
-                target_mat = rf(user_records[0], 'matricula') if user_records else None
-                user_workload = workload_map.get(target_mat, '40h') or '40h'
-                # Calculate daily hours more flexibly based on workload (e.g., 40h -> 8h, 30h -> 6h, 20h -> 4h)
-                try:
-                    user_workload_clean = str(user_workload).lower().replace('h','')
-                    daily_hours = int(user_workload_clean) / 5
-                except:
-                    daily_hours = 8
-                user_cargo = cargo_map.get(target_mat, 'xxx')
-                user_name = rf(user_records[0], 'name') if user_records else "Desconhecido"
-                
-                # Determine year
-                m_year = datetime.datetime.now().year
-                if target_year_arg:
-                    try: m_year = int(target_year_arg)
-                    except: pass
-                elif user_records:
-                    ts = rf(user_records[-1], 'timestamp')
-                    if ts:
-                        dtt = ts if isinstance(ts, datetime.datetime) else datetime.datetime.strptime(str(ts).split('.')[0], '%Y-%m-%d %H:%M:%S')
-                        m_year = dtt.year
-                    
-                months_data = {}
-                for r in user_records:
-                    ts = rf(r, 'timestamp')
-                    if not ts: continue
-                    dt = ts if isinstance(ts, datetime.datetime) else datetime.datetime.strptime(str(ts).split('.')[0], '%Y-%m-%d %H:%M:%S')
-                    if dt.year != m_year: continue # Export only one year per file
-                    month_key = dt.strftime('%Y-%m')
-                    if month_key not in months_data: months_data[month_key] = {"days": {}}
-                    
-                    day_key = dt.strftime('%Y-%m-%d')
-                    if day_key not in months_data[month_key]["days"]: months_data[month_key]["days"][day_key] = []
-                    months_data[month_key]["days"][day_key].append({'type': rf(r, 'record_type'), 'time': dt, 'is_retroactive': rf(r, 'is_retroactive'), 'is_reviewed': rf(r, 'is_reviewed')})
-
-                import os, calendar, traceback
-                try:
-                    base_d = os.path.abspath(os.path.dirname(__file__))
-                    template_path = os.path.join(base_d, "PADRAO 8 HS.xlsx")
-                    wb = openpyxl.load_workbook(template_path)
-                except Exception as ex_open:
-                    with open(os.path.join(base_d, "backend.log"), "a") as flog: flog.write(f"\nError loading template: {ex_open}\n")
-                    wb = openpyxl.Workbook() # Fallback if template missing
-
-                all_holidays = get_all_holidays()
-                month_names = ["JAN", "FEV", "MAR", "ABR", "MAIO", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"]
-                
-                for m_idx, m_name in enumerate(month_names):
-                    m_num = m_idx + 1
-                    if m_name in wb.sheetnames:
-                        ws = wb[m_name]
-                        ws['K6'] = datetime.datetime(m_year, m_num, 1)
-                        ws['C6'] = user_name
-                        ws['C7'] = user_cargo
-                        ws['L10'] = target_mat
-                        h = int(daily_hours)
-                        m = int((daily_hours - h) * 60)
-                        ws['L7'] = datetime.time(h, m)
-                        ws['N9'] = m_year
-                        ws['J13'] = 'entrada EXTRA'
-                        ws['K13'] = 'saída EXTRA'
-                        
-                        m_key = f"{m_year}-{m_num:02d}"
-                        month_data = months_data.get(m_key, {"days": {}})
-                        num_days = calendar.monthrange(m_year, m_num)[1]
-                        
-                        for d_idx in range(1, num_days + 1):
-                            row_idx = 13 + d_idx
-                            d_key_str = f"{m_year}-{m_num:02d}-{d_idx:02d}"
-                            
-                            # Holiday logic
-                            current_date = datetime.date(m_year, m_num, d_idx)
-                            is_weekend = current_date.weekday() >= 5
-                            is_holiday = False
-                            if is_weekend:
-                                is_holiday = True
-                            elif current_date.strftime('%m-%d') in all_holidays:
-                                is_holiday = True
-                            elif d_key_str in all_holidays:
-                                is_holiday = True
-                                
-                            ws.cell(row=row_idx, column=1, value='F' if is_holiday else 'U')
-                            
-                            punches = month_data["days"].get(d_key_str, [])
-                            
-                            has_atestado = False
-                            has_abono = False
-                            has_comp = False
-                            ent_m, sai_m, ent_t, sai_t, ent_x, sai_x = None, None, None, None, None, None
-                            
-                            if len(punches) > 0:
-                                punches.sort(key=lambda x: x['time'])
-                                real_punches = []
-                                for p in punches:
-                                    t_val = p['time'].time() if isinstance(p['time'], datetime.datetime) else None
-                                    if t_val is None: continue # Allow 00:00:00 times
-                                    
-                                    t_str = (p['type'] or "").lower()
-                                    # Broaden detection to catch any variation of compensation/balance/absence
-                                    if any(x in t_str for x in ['compens', 'saldo', 'uso', 'abono', 'atestat']):
-                                        if 'atestado' in t_str and 'dia todo' in t_str:
-                                            has_atestado = True
-                                        elif 'abono' in t_str and 'dia todo' in t_str:
-                                            has_abono = True
-                                        else:
-                                            has_comp = True
-                                    else:
-                                        real_punches.append(p)
-                                
-                                if has_atestado or has_abono or has_comp:
-                                    print(f"DEBUG EXCEL: Day {d_key_str} - atestado={has_atestado}, abono={has_abono}, comp={has_comp}")
-                                
-                                # Process corrections: if there is an approved retroactive punch of a certain type,
-                                # it overrides any non-retroactive punch of the SAME type.
-                                final_punches = []
-                                grouped_by_type = {}
-                                for p in real_punches:
-                                    t = p['type']
-                                    if t not in grouped_by_type:
-                                        grouped_by_type[t] = []
-                                    grouped_by_type[t].append(p)
-                                
-                                for t, pts in grouped_by_type.items():
-                                    approved_retros = [p for p in pts if p.get('is_retroactive') and p.get('is_reviewed')]
-                                    if approved_retros:
-                                        # If there are approved retroactives for this type, only keep those (usually just 1)
-                                        final_punches.extend(approved_retros)
-                                    else:
-                                        # Otherwise keep all regular punches of this type
-                                        final_punches.extend(pts)
-                                
-                                final_punches.sort(key=lambda x: x['time'])
-                                
-                                standard_punches = [p for p in final_punches if '3º turno' not in (p['type'] or "").lower()]
-                                extra_punches = [p for p in final_punches if '3º turno' in (p['type'] or "").lower()]
-                                
-                                assigned_indices = set()
-                                # Smart assignment for standard punches: prioritize by record type
-                                for i, p in enumerate(standard_punches):
-                                    t_val = p['time'].time() if isinstance(p['time'], datetime.datetime) else None
-                                    t_str = (p['type'] or "").lower()
-                                    
-                                    # Map specific types to slots if they are empty
-                                    if 'entrada' in t_str and ent_m is None and 'extra' not in t_str and 'volta' not in t_str:
-                                        ent_m = t_val
-                                        assigned_indices.add(i)
-                                    elif ('saída almoço' in t_str or 'saida almoco' in t_str) and sai_m is None:
-                                        sai_m = t_val
-                                        assigned_indices.add(i)
-                                    elif ('volta almoço' in t_str or 'volta almoco' in t_str) and ent_t is None:
-                                        ent_t = t_val
-                                        assigned_indices.add(i)
-                                    elif 'saída' in t_str and sai_t is None and 'extra' not in t_str and 'almoço' not in t_str and 'almoco' not in t_str:
-                                        sai_t = t_val
-                                        assigned_indices.add(i)
-
-                                # Fallback to sequential assignment for any remaining empty slots
-                                unassigned_punches = [p for i, p in enumerate(standard_punches) if i not in assigned_indices]
-                                for p in unassigned_punches:
-                                    t_val = p['time'].time() if isinstance(p['time'], datetime.datetime) else None
-                                    if ent_m is None: ent_m = t_val
-                                    elif sai_m is None: sai_m = t_val
-                                    elif ent_t is None: ent_t = t_val
-                                    elif sai_t is None: sai_t = t_val
-                                
-                                # Assignment for extra punches (bank/doctor absence)
-                                for p in extra_punches:
-                                    t_val = p['time'].time() if isinstance(p['time'], datetime.datetime) else None
-                                    t_str = (p['type'] or "").lower()
-                                    if 'entrada extra' in t_str:
-                                        ent_x = t_val # Column J
-                                    elif 'saída extra' in t_str or 'saida extra' in t_str:
-                                        sai_x = t_val # Column K
-                            
-                            if has_comp:
-                                # Ensure pairs are closed with the same time if one is missing, 
-                                # so the formula (G-F) results in 0 instead of an error.
-                                if ent_m is not None and sai_m is None: sai_m = ent_m
-                                if ent_t is not None and sai_t is None: sai_t = ent_t
-                                if ent_x is not None and sai_x is None: sai_x = ent_x
-
-                            # Always write the times if they exist, otherwise clear the cell
-                            ws.cell(row=row_idx, column=6, value=ent_m if ent_m is not None else "").number_format = 'hh:mm:ss'
-                            ws.cell(row=row_idx, column=7, value=sai_m if sai_m is not None else "").number_format = 'hh:mm:ss'
-                            ws.cell(row=row_idx, column=8, value=ent_t if ent_t is not None else "").number_format = 'hh:mm:ss'
-                            ws.cell(row=row_idx, column=9, value=sai_t if sai_t is not None else "").number_format = 'hh:mm:ss'
-                            ws.cell(row=row_idx, column=10, value=ent_x if ent_x is not None else "").number_format = 'hh:mm:ss'
-                            ws.cell(row=row_idx, column=11, value=sai_x if sai_x is not None else "").number_format = 'hh:mm:ss'
-                            
-                            # Overwrite formula in L to SUBTRACT the extra shift (absence)
-                            # Formula in L matching template intent (G-F + I-H + K-J)
-                            ws.cell(row=row_idx, column=12, value=f'=IF(A{row_idx}="U",(G{row_idx}-F{row_idx})+(I{row_idx}-H{row_idx})+(K{row_idx}-J{row_idx}),"NÃO ÚTIL")')
-
-                            # Calculate worked time in seconds for bank deduction logic
-                            def t_to_s(t):
-                                if t is None: return 0
-                                return t.hour * 3600 + t.minute * 60 + t.second
-                            
-                            w_sec = 0
-                            if ent_m and sai_m: w_sec += max(0, t_to_s(sai_m) - t_to_s(ent_m))
-                            if ent_t and sai_t: w_sec += max(0, t_to_s(sai_t) - t_to_s(ent_t))
-                            if ent_x and sai_x: w_sec += max(0, t_to_s(sai_x) - t_to_s(ent_x))
-                            
-                            daily_sec = daily_hours * 3600
-                            deficit_sec = max(0, daily_sec - w_sec)
-
-                            if has_atestado or has_abono or has_comp:
-                                if has_atestado or has_abono:
-                                    val_str = "ATESTADO" if has_atestado else "ABONO"
-                                    ws.cell(row=row_idx, column=12, value=val_str)
-                                    ws.cell(row=row_idx, column=13, value=val_str)
-                                    ws.cell(row=row_idx, column=14, value=val_str)
-                                    # For justified absences, balance impact is 0
-                                    ws.cell(row=row_idx, column=16, value=0)
-                                else:
-                                    # For compensation, we show the label in main columns
-                                    val_str = "COMPENSAÇÃO"
-                                    ws.cell(row=row_idx, column=12, value=val_str)
-                                    ws.cell(row=row_idx, column=13, value=val_str)
-                                    ws.cell(row=row_idx, column=14, value=val_str)
-                                    # BUT we subtract the correct deficit from the bank
-                                    ws.cell(row=row_idx, column=16, value=-(deficit_sec / 86400.0)).number_format = '[h]:mm:ss'
-                                
-                        # After processing all days, link the balances between months
-                        TEMPLATE_CELLS = {
-                            'JAN': {'ant': 'M53', 'tot': 'M55'}, 'FEV': {'ant': 'M51', 'tot': 'M53'}, 
-                            'MAR': {'ant': 'M53', 'tot': 'M55'}, 'ABR': {'ant': 'M52', 'tot': 'M54'}, 
-                            'MAIO': {'ant': 'M53', 'tot': 'M55'}, 'JUN': {'ant': 'M52', 'tot': 'M54'}, 
-                            'JUL': {'ant': 'M53', 'tot': 'M55'}, 'AGO': {'ant': 'M53', 'tot': 'M55'}, 
-                            'SET': {'ant': 'M52', 'tot': 'M54'}, 'OUT': {'ant': 'M53', 'tot': 'M55'}, 
-                            'NOV': {'ant': 'M52', 'tot': 'M54'}, 'DEZ': {'ant': 'M53', 'tot': 'M55'}
-                        }
-                        if m_name in TEMPLATE_CELLS:
-                            ant_cell = TEMPLATE_CELLS[m_name]['ant']
-                            
-                            # Determine if this month is before or equal to the first punch month
-                            first_punch_month = None
-                            if user_records:
-                                ts_first = rf(user_records[-1], 'timestamp') # user_records is reverse chronological, so [-1] is the first punch!
-                                if ts_first:
-                                    dt_first = ts_first if isinstance(ts_first, datetime.datetime) else datetime.datetime.strptime(str(ts_first).split('.')[0], '%Y-%m-%d %H:%M:%S')
-                                    first_punch_month = datetime.date(dt_first.year, dt_first.month, 1)
-                            
-                            this_month_date = datetime.date(m_year, m_num, 1)
-                            
-                            is_before_or_start_month = False
-                            if first_punch_month and this_month_date <= first_punch_month:
-                                is_before_or_start_month = True
-                            
-                            if is_before_or_start_month:
-                                ws['Q4'] = 0
-                                ws[ant_cell] = f"=Q4"
-                                ws['Q4'].number_format = '[h]:mm:ss'
-                                ws[ant_cell].number_format = '[h]:mm:ss'
-                            else:
-                                if m_idx > 0:
-                                    prev_name = month_names[m_idx - 1]
-                                    prev_tot = TEMPLATE_CELLS[prev_name]['tot']
-                                    ws['Q4'] = f"='{prev_name}'!{prev_tot}"
-                                    ws[ant_cell] = f"=Q4"
-                                else:
-                                    prev_bal_days = get_previous_years_balance(user_records, m_year, daily_hours)
-                                    ws['Q4'] = prev_bal_days
-                                    ws[ant_cell] = f"=Q4"
-                                    ws['Q4'].number_format = '[h]:mm:ss'
-                                    ws[ant_cell].number_format = '[h]:mm:ss'
-                                
-            except Exception as e_main:
-                import traceback, os
-                with open(os.path.join(os.path.abspath(os.path.dirname(__file__)), "backend.log"), "a") as flog:
-                    flog.write(f"\nCRITICAL EXCEL ERROR:\n{traceback.format_exc()}\n")
-                raise e_main
-        else:
-            wb.remove(wb.active)
-            groups = {}
-            for r in rows:
-                k = (rf(r,'matricula'), rf(r,'name'))
-                groups.setdefault(k, []).append(r)
-            for (m, n), items in groups.items():
-                ws = wb.create_sheet(title=(n or m or "User")[:30])
-                ws.append(["Matricula", "Nome", "Cargo", "Tipo", "Data/Hora", "Bairro", "Cidade", "Latitude", "Longitude", "Precisão (m)", "Endereço Completo", "Manual?", "Justificativa", "Anexo"])
-                for r in items:
-                    mat = rf(r,'matricula')
-                    c = cargo_map.get(mat, 'Funcionario')
-                    ws.append([mat, rf(r,'name'), c, rf(r,'record_type'), rf(r,'timestamp'), rf(r,'neighborhood'), rf(r,'city'), rf(r,'latitude'), rf(r,'longitude'), rf(r,'accuracy'), rf(r,'full_address'), 'Sim' if rf(r,'is_retroactive') else 'Não', rf(r,'justification') or '', rf(r,'document_path') or ''])
-        
+        excel_pass = 'Sedu@2023'
         if is_protected:
-            # Fetch password from SystemConfig
-            excel_pass = 'Sedu@2023'
             try:
                 conn_tmp = get_db_connection()
                 cur_tmp = conn_tmp.cursor()
@@ -2271,26 +2251,45 @@ def _generate_excel_response(target_user_id, target_year_arg=None, is_protected=
                     excel_pass = rf(row_tmp, 'value')
                 conn_tmp.close()
             except: pass
+
+        if target_user_id:
+            if not rows:
+                return jsonify({'message': 'No records found'}), 404
             
-            from openpyxl.styles import Protection
-            prot = Protection(locked=True)
-            for sheet in wb.worksheets:
-                for row in sheet.iter_rows():
-                    for cell in row:
-                        cell.protection = prot
-                sheet.protection.sheet = True
-                sheet.protection.password = excel_pass
-        
-        out = BytesIO()
-        wb.save(out)
-        out.seek(0)
-        
-        fname = "Relatorio_Geral.xlsx"
-        if target_user_id and len(rows) > 0:
+            user_records = list(rows)
+            user_records.reverse()
+            out = build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, is_protected, excel_pass)
+            
             user_n = rf(rows[0], 'name') or target_user_id
             fname = f"Ponto - {user_n}.xlsx"
+            return send_file(out, download_name=fname, as_attachment=True)
             
-        return send_file(out, download_name=fname, as_attachment=True)
+        else:
+            # Zip multiple files
+            memory_file = BytesIO()
+            with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+                # Group records by matricula
+                groups = {}
+                for r in rows:
+                    mat = rf(r, 'matricula')
+                    groups.setdefault(mat, []).append(r)
+                
+                for mat, user_rows in groups.items():
+                    user_records = list(user_rows)
+                    user_records.reverse()
+                    try:
+                        out_wb = build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, is_protected, excel_pass)
+                        user_n = rf(user_records[0], 'name') or mat
+                        # Replace invalid characters for filename
+                        safe_name = "".join([c for c in user_n if c.isalpha() or c.isdigit() or c in ' -_']).rstrip()
+                        fname = f"Ponto - {safe_name}.xlsx"
+                        zf.writestr(fname, out_wb.getvalue())
+                    except Exception as loop_e:
+                        print(f"Error building workbook for {mat}: {loop_e}")
+                        
+            memory_file.seek(0)
+            return send_file(memory_file, download_name="Relatorio_Geral_Zip.zip", mimetype='application/zip', as_attachment=True)
+            
     except Exception as e:
         import traceback
         traceback.print_exc()

@@ -226,7 +226,7 @@
 </div>
 <button onclick="openRetroactiveModal()" class="w-full flex items-center justify-center gap-2 py-4 px-6 border border-outline-variant/30 text-on-surface-variant rounded-xl font-medium text-sm hover:bg-surface-container-low transition-all active:scale-[0.98] group">
 <span class="text-orange-500">⚠️</span>
-            Esqueci de bater o ponto / Corrigir o ponto
+            Esqueci de bater meu ponto\ Corrigir ponto\ Registro de Férias
         </button>
 </div>
 
@@ -293,16 +293,26 @@
 <div id="retroactiveModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
         <div class="bg-surface-container text-on-surface px-6 py-4 flex justify-between items-center border-b border-outline-variant/20">
-            <h5 class="font-bold text-lg">Esqueci de bater o ponto / Corrigir o ponto</h5>
+            <h5 class="font-bold text-lg">Esqueci de bater meu ponto\ Corrigir ponto\ Registro de Férias</h5>
             <button onclick="document.getElementById('retroactiveModal').classList.add('hidden')" class="w-8 h-8 rounded-full hover:bg-surface-container-high transition-colors flex justify-center items-center">
                 <span class="material-symbols-outlined">close</span>
             </button>
         </div>
         <div class="p-6 overflow-y-auto">
             <form id="retroactiveForm" onsubmit="submitRetroactivePunch(event)" class="space-y-4">
-                <div>
+                <div id="retroSingleDateDiv">
                     <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">Data e Hora do Ponto</label>
                     <input type="datetime-local" id="retroDatetime" required class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg h-12 px-3 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all">
+                </div>
+                <div id="retroRangeDateDiv" class="hidden flex gap-2">
+                    <div class="flex-1">
+                        <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">Data Inicial</label>
+                        <input type="date" id="retroStartDate" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg h-12 px-3 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all">
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">Data Final</label>
+                        <input type="date" id="retroEndDate" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg h-12 px-3 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all">
+                    </div>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">Tipo do Ponto</label>
@@ -317,6 +327,7 @@
                             <option value="Atestado (Dia Todo)">Atestado (Dia Todo)</option>
                             <option value="Abono (Dia Todo)">Abono (Dia Todo)</option>
                             <option value="Uso de Saldo/Compensação">Uso de Saldo/Compensação</option>
+                            <option value="Férias">Férias</option>
                         </select>
                         <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
                     </div>
@@ -842,7 +853,35 @@
             const dStr = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,'0') + "-" + String(now.getDate()).padStart(2,'0') + "T08:00";
             document.getElementById('retroDatetime').value = dStr;
             
+            document.getElementById('retroSingleDateDiv').classList.remove('hidden');
+            document.getElementById('retroRangeDateDiv').classList.add('hidden');
+            document.getElementById('retroDatetime').required = true;
+            document.getElementById('retroStartDate').required = false;
+            document.getElementById('retroEndDate').required = false;
         }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const rt = document.getElementById('retroType');
+            if(rt) {
+                rt.addEventListener('change', function(e) {
+                    if (e.target.value === 'Férias') {
+                        document.getElementById('retroSingleDateDiv').classList.add('hidden');
+                        document.getElementById('retroRangeDateDiv').classList.remove('hidden');
+                        document.getElementById('retroRangeDateDiv').classList.add('flex');
+                        document.getElementById('retroDatetime').required = false;
+                        document.getElementById('retroStartDate').required = true;
+                        document.getElementById('retroEndDate').required = true;
+                    } else {
+                        document.getElementById('retroSingleDateDiv').classList.remove('hidden');
+                        document.getElementById('retroRangeDateDiv').classList.add('hidden');
+                        document.getElementById('retroRangeDateDiv').classList.remove('flex');
+                        document.getElementById('retroDatetime').required = true;
+                        document.getElementById('retroStartDate').required = false;
+                        document.getElementById('retroEndDate').required = false;
+                    }
+                });
+            }
+        });
 
         async function submitRetroactivePunch(event) {
             event.preventDefault();
@@ -856,46 +895,95 @@
             const justification = document.getElementById('retroJustification').value;
             const fileInput = document.getElementById('retroDocument');
 
-            const formData = new FormData();
-            formData.append('datetime', dt);
-            formData.append('type', type);
-            formData.append('justification', justification);
-            
-            if (fileInput.files.length > 0) {
-                formData.append('document', fileInput.files[0]);
-            }
-
-            // Add Location Data of the moment the correction is being made
-            formData.append('latitude', currentLocation.latitude || '');
-            formData.append('longitude', currentLocation.longitude || '');
-            formData.append('accuracy', currentLocation.accuracy || '');
-            formData.append('neighborhood', document.getElementById('locNeighborhood').value || currentLocation.neighborhood || '');
-            formData.append('city', document.getElementById('locCity').value || currentLocation.city || '');
-            formData.append('full_address', currentLocation.full_address || '');
-
-            try {
-                if (window.API_READY) await window.API_READY;
-                const response = await fetch((window.API_BASE_URL || '') + `/api/punch/retroactive`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }, // Do not set Content-Type; FormData sets it with boundary
-                    body: formData
-                });
-                
-                if (response.ok) {
-                    alert('Ponto retroativo salvo com sucesso!');
+            if (type === 'Férias') {
+                const sDateStr = document.getElementById('retroStartDate').value;
+                const eDateStr = document.getElementById('retroEndDate').value;
+                if (!sDateStr || !eDateStr) {
+                    alert('Preencha a data inicial e final.');
+                    btn.disabled = false; btn.innerHTML = 'Salvar Registro';
+                    return;
+                }
+                const start = new Date(sDateStr + 'T00:00:00');
+                const end = new Date(eDateStr + 'T00:00:00');
+                let allOk = true;
+                for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                    const y = d.getFullYear();
+                    const mo = String(d.getMonth() + 1).padStart(2, '0');
+                    const da = String(d.getDate()).padStart(2, '0');
+                    const dtStr = `${y}-${mo}-${da}T08:00`;
+                    
+                    const fd = new FormData();
+                    fd.append('type', 'Férias');
+                    fd.append('datetime', dtStr);
+                    fd.append('justification', justification);
+                    if (fileInput.files.length > 0) fd.append('document', fileInput.files[0]);
+                    fd.append('latitude', currentLocation.latitude || '');
+                    fd.append('longitude', currentLocation.longitude || '');
+                    fd.append('accuracy', currentLocation.accuracy || '');
+                    fd.append('neighborhood', document.getElementById('locNeighborhood').value || currentLocation.neighborhood || '');
+                    fd.append('city', document.getElementById('locCity').value || currentLocation.city || '');
+                    fd.append('full_address', currentLocation.full_address || '');
+                    
+                    try {
+                        if (window.API_READY) await window.API_READY;
+                        const rRes = await fetch((window.API_BASE_URL || '') + '/api/punch/retroactive', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}` },
+                            body: fd
+                        });
+                        if (!rRes.ok) allOk = false;
+                    } catch (e) {
+                        allOk = false;
+                    }
+                }
+                if (allOk) {
+                    alert('Férias salvas com sucesso!');
                     document.getElementById('retroactiveModal').classList.add('hidden');
                     loadHistory();
                 } else {
-                    const errJs = await response.json().catch(() => ({}));
-                    alert("Erro ao registrar ponto retroativo: " + (errJs.message || response.statusText));
+                    alert("Erro ao registrar algumas datas das Férias.");
                 }
-            } catch (error) {
-                alert("Erro de conexão ao tentar salvar.");
-                console.error(error);
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = 'Salvar Registro';
+            } else {
+                const formData = new FormData();
+                formData.append('datetime', dt);
+                formData.append('type', type);
+                formData.append('justification', justification);
+                
+                if (fileInput.files.length > 0) {
+                    formData.append('document', fileInput.files[0]);
+                }
+
+                // Add Location Data of the moment the correction is being made
+                formData.append('latitude', currentLocation.latitude || '');
+                formData.append('longitude', currentLocation.longitude || '');
+                formData.append('accuracy', currentLocation.accuracy || '');
+                formData.append('neighborhood', document.getElementById('locNeighborhood').value || currentLocation.neighborhood || '');
+                formData.append('city', document.getElementById('locCity').value || currentLocation.city || '');
+                formData.append('full_address', currentLocation.full_address || '');
+
+                try {
+                    if (window.API_READY) await window.API_READY;
+                    const response = await fetch((window.API_BASE_URL || '') + `/api/punch/retroactive`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }, // Do not set Content-Type; FormData sets it with boundary
+                        body: formData
+                    });
+                    
+                    if (response.ok) {
+                        alert('Ponto retroativo salvo com sucesso!');
+                        document.getElementById('retroactiveModal').classList.add('hidden');
+                        loadHistory();
+                    } else {
+                        const errJs = await response.json().catch(() => ({}));
+                        alert("Erro ao registrar ponto retroativo: " + (errJs.message || response.statusText));
+                    }
+                } catch (error) {
+                    alert("Erro de conexão ao tentar salvar.");
+                    console.error(error);
+                }
             }
+            btn.disabled = false;
+            btn.innerHTML = 'Salvar Registro';
         }
         // -------------------------
 
@@ -1348,7 +1436,7 @@
                 const dayRecords = records.filter(r => r.timestamp.startsWith(dayStr));
                 const stdPunches = dayRecords.filter(r => {
                     const t = (r.type || "").toLowerCase();
-                    return !(t.includes('atestado') || t.includes('abono') || t.includes('compensação') || t.includes('compensacao') || t.includes('saldo') || t.includes('3º turno') || t.includes('extra'));
+                    return !(t.includes('atestado') || t.includes('abono') || t.includes('férias') || t.includes('ferias') || t.includes('compensação') || t.includes('compensacao') || t.includes('saldo') || t.includes('3º turno') || t.includes('extra'));
                 });
                 
                 const groupedByType = {};
@@ -1383,7 +1471,7 @@
                     if (!timeStr) return;
                     const t = (p.type || "").trim();
                     const tLow = t.toLowerCase();
-                    if (tLow.includes('saldo') || tLow.includes('compens') || tLow.includes('atestado') || tLow.includes('abono') || tLow.includes('extra') || tLow.includes('3º turno')) return;
+                    if (tLow.includes('saldo') || tLow.includes('compens') || tLow.includes('atestado') || tLow.includes('abono') || tLow.includes('férias') || tLow.includes('ferias') || tLow.includes('extra') || tLow.includes('3º turno')) return;
                     
                     if (t === "Entrada" && !e1) e1 = timeStr;
                     else if ((t === "Saída Almoço" || t === "Saida Almoco") && !s1) s1 = timeStr;
@@ -1404,6 +1492,7 @@
                 let mObs = [];
                 let hasAtestado = false;
                 let hasAbono = false;
+                let hasFerias = false;
                 dayRecords.forEach(r => {
                     if (!r.is_retroactive || r.is_reviewed) {
                         let t = (r.type || "").toLowerCase();
@@ -1413,6 +1502,9 @@
                         } else if (t.includes('abono')) {
                             mObs.push("ABONO");
                             hasAbono = true;
+                        } else if (t.includes('férias') || t.includes('ferias')) {
+                            mObs.push("FÉRIAS");
+                            hasFerias = true;
                         } else if (t.includes('compensação') || t.includes('compensacao') || t.includes('saldo')) {
                             mObs.push("COMPENSAÇÃO / USO DE SALDO");
                         }
@@ -1422,6 +1514,9 @@
                 if (isHoliday) {
                     obs = isHoliday;
                     e1 = " -- "; s1 = " -- "; e2 = " -- "; s2 = " -- ";
+                } else if (hasFerias) {
+                    obs = mObs.join(' / ');
+                    e1 = " . "; s1 = " . "; e2 = " . "; s2 = " . ";
                 } else if (hasAtestado || hasAbono) {
                     obs = mObs.join(' / ');
                     e1 = " -- "; s1 = " -- "; e2 = " -- "; s2 = " -- ";

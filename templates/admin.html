@@ -505,7 +505,7 @@
                     const downloadUrl = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = downloadUrl;
-                    a.download = userId ? `Ponto - ${userName}.xlsx` : 'Relatorio_Geral.xlsx';
+                    a.download = userId ? `Ponto - ${userName}.xlsx` : 'Relatorios_Gerais.zip';
                     document.body.appendChild(a);
                     a.click();
                     a.remove();
