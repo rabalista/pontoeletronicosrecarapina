@@ -2159,6 +2159,10 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                             if has_atestado: val_str = "ATESTADO"
                             elif has_abono: val_str = "ABONO"
                             else: val_str = "FÉRIAS"
+                            ws.cell(row=row_idx, column=6, value=val_str)
+                            ws.cell(row=row_idx, column=7, value=val_str)
+                            ws.cell(row=row_idx, column=8, value=val_str)
+                            ws.cell(row=row_idx, column=9, value=val_str)
                             ws.cell(row=row_idx, column=12, value=val_str)
                             ws.cell(row=row_idx, column=13, value=val_str)
                             ws.cell(row=row_idx, column=14, value=val_str)

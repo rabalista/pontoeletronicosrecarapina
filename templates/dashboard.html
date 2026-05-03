@@ -1530,7 +1530,7 @@
                     e1 = " -- "; s1 = " -- "; e2 = " -- "; s2 = " -- ";
                 } else if (hasFerias) {
                     obs = mObs.join(' / ');
-                    e1 = " . "; s1 = " . "; e2 = " . "; s2 = " . ";
+                    e1 = " -- "; s1 = " -- "; e2 = " -- "; s2 = " -- ";
                 } else if (hasAtestado || hasAbono) {
                     obs = mObs.join(' / ');
                     e1 = " -- "; s1 = " -- "; e2 = " -- "; s2 = " -- ";
@@ -1732,7 +1732,7 @@
                 
                 const stdPunches = dayRecords.filter(r => {
                     const t = (r.type || "").toLowerCase();
-                    return !(t.includes('atestado') || t.includes('abono') || t.includes('compensação') || t.includes('compensacao') || t.includes('saldo') || t.includes('3º turno') || t.includes('extra'));
+                    return !(t.includes('atestado') || t.includes('abono') || t.includes('férias') || t.includes('ferias') || t.includes('compensação') || t.includes('compensacao') || t.includes('saldo') || t.includes('3º turno') || t.includes('extra'));
                 });
                 
                 const groupedByType = {};

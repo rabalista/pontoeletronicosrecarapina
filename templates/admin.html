@@ -1080,7 +1080,7 @@
                     
                     const stdPunches = dayRecords.filter(r => {
                         const t = (r.type || "").toLowerCase();
-                        return !(t.includes('atestado') || t.includes('abono') || t.includes('compensação') || t.includes('compensacao') || t.includes('saldo') || t.includes('3º turno') || t.includes('extra'));
+                        return !(t.includes('atestado') || t.includes('abono') || t.includes('férias') || t.includes('ferias') || t.includes('compensação') || t.includes('compensacao') || t.includes('saldo') || t.includes('3º turno') || t.includes('extra'));
                     });
                     
                     const groupedByType = {};
@@ -1423,7 +1423,7 @@
                     
                     const stdPunches = dayRecords.filter(r => {
                         const t = (r.type || "").toLowerCase();
-                        return !(t.includes('atestado') || t.includes('abono') || t.includes('compensação') || t.includes('compensacao') || t.includes('saldo') || t.includes('3º turno') || t.includes('extra'));
+                        return !(t.includes('atestado') || t.includes('abono') || t.includes('férias') || t.includes('ferias') || t.includes('compensação') || t.includes('compensacao') || t.includes('saldo') || t.includes('3º turno') || t.includes('extra'));
                     });
                     
                     const groupedByType = {};
@@ -1458,7 +1458,7 @@
                         if (!timeStr) return;
                         const t = (p.type || "").trim();
                         const tLow = t.toLowerCase();
-                        if (tLow.includes('saldo') || tLow.includes('compens') || tLow.includes('atestado') || tLow.includes('abono') || tLow.includes('extra') || tLow.includes('3º turno')) return;
+                        if (tLow.includes('saldo') || tLow.includes('compens') || tLow.includes('atestado') || tLow.includes('abono') || tLow.includes('férias') || tLow.includes('ferias') || tLow.includes('extra') || tLow.includes('3º turno')) return;
                         
                         if (t === "Entrada" && !e1) e1 = timeStr;
                         else if ((t === "Saída Almoço" || t === "Saida Almoco") && !s1) s1 = timeStr;
@@ -1480,23 +1480,32 @@
                     let mObs = [];
                     let hasAtestado = false;
                     let hasAbono = false;
+                    let hasFerias = false;
                     let hasComp = false;
                     dayRecords.forEach(r => {
-                        let t = (r.type || "").toLowerCase();
-                        if (t.includes('atestado')) {
-                            mObs.push("ATESTADO");
-                            hasAtestado = true;
-                        } else if (t.includes('abono')) {
-                            mObs.push("ABONO");
-                            hasAbono = true;
-                        } else if (t.includes('compensação') || t.includes('compensacao') || t.includes('saldo')) {
-                            mObs.push("COMPENSAÇÃO / USO DE SALDO");
-                            hasComp = true;
+                        if (!r.is_retroactive || r.is_reviewed) {
+                            let t = (r.type || "").toLowerCase();
+                            if (t.includes('atestado')) {
+                                mObs.push("ATESTADO");
+                                hasAtestado = true;
+                            } else if (t.includes('abono')) {
+                                mObs.push("ABONO");
+                                hasAbono = true;
+                            } else if (t.includes('férias') || t.includes('ferias')) {
+                                mObs.push("FÉRIAS");
+                                hasFerias = true;
+                            } else if (t.includes('compensação') || t.includes('compensacao') || t.includes('saldo')) {
+                                mObs.push("COMPENSAÇÃO / USO DE SALDO");
+                                hasComp = true;
+                            }
                         }
                     });
 
                     if (isHoliday) {
                         obs = isHoliday;
+                        e1 = " -- "; s1 = " -- "; e2 = " -- "; s2 = " -- ";
+                    } else if (hasFerias) {
+                        obs = mObs.join(' / ');
                         e1 = " -- "; s1 = " -- "; e2 = " -- "; s2 = " -- ";
                     } else if (hasAtestado || hasAbono) {
                         obs = mObs.join(' / ');
