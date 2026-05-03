@@ -1089,7 +1089,11 @@
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const currentMonthStr = `${year}-${month}`;
 
-            const monthlyRecords = allRecords.filter(r => (r.timestamp || "").startsWith(currentMonthStr));
+            const monthlyRecords = allRecords.filter(r => {
+                if (r.pending || (r.is_retroactive && !r.is_reviewed)) return true;
+                if (r.type === 'Férias') return true;
+                return (r.timestamp || "").startsWith(currentMonthStr);
+            });
 
             // Atualiza o estado dos pontos de hoje para validação de sequência
             const day = String(now.getDate()).padStart(2, '0');
@@ -1439,6 +1443,7 @@
                 return expanded;
             }
 
+            records = records.filter(r => !(r.type || "").toLowerCase().includes('cancelado'));
             records = expandFeriasRecords(records);
 
             const dStart = new Date(reportDate.getFullYear(), reportDate.getMonth(), 1);

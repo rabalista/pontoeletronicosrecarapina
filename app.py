@@ -1164,6 +1164,51 @@ def self_pending_records(user_matricula):
     except: pass
     return pending
 
+@app.route('/api/punch/<string:transaction_id>', methods=['DELETE'])
+@token_required
+def delete_punch_by_user(curr_user_mat, role, transaction_id):
+    conn = get_db_connection()
+    ph = get_ph(conn)
+    cursor = conn.cursor()
+    try:
+        is_sqlite = isinstance(conn, sqlite3.Connection)
+        nolock = "" if is_sqlite else "WITH (NOLOCK)"
+        
+        cursor.execute(f"SELECT record_type, matricula FROM TimeRecords {nolock} WHERE transaction_id = {ph}", (transaction_id,))
+        row = cursor.fetchone()
+        
+        if not row:
+            return jsonify({'message': 'Registro não encontrado.'}), 404
+            
+        mat = rf(row, 'matricula')
+        rtype = rf(row, 'record_type')
+        
+        if mat != curr_user_mat and role != 'admin':
+            return jsonify({'message': 'Sem permissão para deletar este registro.'}), 403
+            
+        allowed_types = ['Férias', 'Abono', 'Abono (Dia Todo)', 'Atestado', 'Atestado (Dia Todo)', 'Compensação', 'Uso de Saldo']
+        if rtype not in allowed_types:
+            return jsonify({'message': 'Este tipo de registro não pode ser cancelado pelo usuário.'}), 400
+            
+        new_type = f"Cancelado - {rtype}"
+        cursor.execute(f"UPDATE TimeRecords SET record_type = {ph} WHERE transaction_id = {ph}", (new_type, transaction_id))
+        if is_sqlite or ph == '?': conn.commit()
+        
+        try:
+            sconn = sqlite3.connect(sqlite_path)
+            scur = sconn.cursor()
+            scur.execute("UPDATE TimeRecords SET record_type = ? WHERE transaction_id = ?", (new_type, transaction_id))
+            sconn.commit()
+            sconn.close()
+        except: pass
+        
+        return jsonify({'message': 'Registro cancelado com sucesso.'}), 200
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
 @app.route('/api/online')
 def online():
     # Se o endpoint foi chamado, o servidor está online.
@@ -1905,6 +1950,10 @@ def _generate_json_report(target_user_id):
         
         records = []
         for r in rows:
+            rtype_str = str(rf(r, 'record_type') or '')
+            if 'cancelado' in rtype_str.lower():
+                continue
+                
             ts = rf(r, 'timestamp')
             if isinstance(ts, datetime.datetime):
                 ts = ts.strftime('%Y-%m-%d %H:%M:%S')
@@ -1954,8 +2003,10 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                 dtt = ts if isinstance(ts, datetime.datetime) else datetime.datetime.strptime(str(ts).split('.')[0], '%Y-%m-%d %H:%M:%S')
                 m_year = dtt.year
             
+            
         import re
         expanded_records = []
+        user_records = [r for r in user_records if 'cancelado' not in str(rf(r, 'record_type') or '').lower()]
         for r in user_records:
             rd = {}
             # Convert row to dictionary if needed

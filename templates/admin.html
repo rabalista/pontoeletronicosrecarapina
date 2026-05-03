@@ -1314,6 +1314,7 @@
                     return expanded;
                 }
 
+                records = records.filter(r => !(r.type || "").toLowerCase().includes('cancelado'));
                 records = expandFeriasRecords(records);
 
                 // 3. Generate PDF
