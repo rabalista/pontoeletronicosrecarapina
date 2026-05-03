@@ -973,6 +973,29 @@
                     throw new Error("Erro ao buscar registros.");
                 }
 
+                function expandFeriasRecords(recs) {
+                    const expanded = [];
+                    recs.forEach(r => {
+                        let isExpanded = false;
+                        if (r.type === 'Férias' && r.justification && r.justification.includes('Férias do período')) {
+                            const match = r.justification.match(/período (\d{4}-\d{2}-\d{2}) a (\d{4}-\d{2}-\d{2})/);
+                            if (match) {
+                                const sDate = new Date(match[1] + 'T12:00:00');
+                                const eDate = new Date(match[2] + 'T12:00:00');
+                                for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
+                                    const dStr = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' 08:00:00';
+                                    expanded.push({ ...r, timestamp: dStr });
+                                }
+                                isExpanded = true;
+                            }
+                        }
+                        if (!isExpanded) expanded.push(r);
+                    });
+                    return expanded;
+                }
+
+                records = expandFeriasRecords(records);
+
                 // 3. Generate PDF (Parity with dashboard.html)
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF({ orientation: 'landscape', format: 'a4' });
@@ -1269,6 +1292,29 @@
                 } else {
                     throw new Error("Erro ao buscar registros.");
                 }
+
+                function expandFeriasRecords(recs) {
+                    const expanded = [];
+                    recs.forEach(r => {
+                        let isExpanded = false;
+                        if (r.type === 'Férias' && r.justification && r.justification.includes('Férias do período')) {
+                            const match = r.justification.match(/período (\d{4}-\d{2}-\d{2}) a (\d{4}-\d{2}-\d{2})/);
+                            if (match) {
+                                const sDate = new Date(match[1] + 'T12:00:00');
+                                const eDate = new Date(match[2] + 'T12:00:00');
+                                for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
+                                    const dStr = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' 08:00:00';
+                                    expanded.push({ ...r, timestamp: dStr });
+                                }
+                                isExpanded = true;
+                            }
+                        }
+                        if (!isExpanded) expanded.push(r);
+                    });
+                    return expanded;
+                }
+
+                records = expandFeriasRecords(records);
 
                 // 3. Generate PDF
                 const { jsPDF } = window.jspdf;

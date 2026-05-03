@@ -1055,7 +1055,7 @@ def history(curr_user_mat, role):
                     SELECT record_type, timestamp, neighborhood, city, transaction_id, is_retroactive, justification, document_path, is_reviewed
                     FROM TimeRecords {nolock}
                     WHERE matricula = {ph} 
-                      AND timestamp >= {ph}
+                      AND (timestamp >= {ph} OR record_type = 'Férias')
                     ORDER BY timestamp DESC
                 """, (user_matricula, cutoff_str))
                 rows = cursor.fetchall()
@@ -1095,7 +1095,7 @@ def history(curr_user_mat, role):
                 SELECT record_type, timestamp, neighborhood, city, transaction_id, is_retroactive, justification, document_path, is_reviewed
                 FROM TimeRecords 
                 WHERE matricula = ? 
-                  AND timestamp >= ?
+                  AND (timestamp >= ? OR record_type = 'Férias')
                 ORDER BY timestamp DESC
             """, (user_matricula, cutoff_str))
             rows = lcur.fetchall()
@@ -1954,6 +1954,35 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                 dtt = ts if isinstance(ts, datetime.datetime) else datetime.datetime.strptime(str(ts).split('.')[0], '%Y-%m-%d %H:%M:%S')
                 m_year = dtt.year
             
+        import re
+        expanded_records = []
+        for r in user_records:
+            rd = {}
+            # Convert row to dictionary if needed
+            for k in r.keys() if hasattr(r, 'keys') else ['matricula', 'name', 'record_type', 'timestamp', 'neighborhood', 'city', 'latitude', 'longitude', 'accuracy', 'full_address', 'is_retroactive', 'justification', 'document_path', 'is_reviewed']:
+                rd[k] = rf(r, k)
+                
+            t = rd.get('record_type')
+            j = rd.get('justification')
+            is_expanded = False
+            
+            if t == 'Férias' and j and 'período' in j:
+                m = re.search(r'período (\d{4}-\d{2}-\d{2}) a (\d{4}-\d{2}-\d{2})', j)
+                if m:
+                    s_date = datetime.datetime.strptime(m.group(1), '%Y-%m-%d')
+                    e_date = datetime.datetime.strptime(m.group(2), '%Y-%m-%d')
+                    curr = s_date
+                    while curr <= e_date:
+                        new_r = dict(rd)
+                        new_r['timestamp'] = curr.strftime('%Y-%m-%d 08:00:00')
+                        expanded_records.append(new_r)
+                        curr += datetime.timedelta(days=1)
+                    is_expanded = True
+            if not is_expanded:
+                expanded_records.append(rd)
+        
+        user_records = expanded_records
+
         months_data = {}
         for r in user_records:
             ts = rf(r, 'timestamp')
