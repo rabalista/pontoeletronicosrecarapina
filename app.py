@@ -1980,10 +1980,10 @@ def _generate_json_report(target_user_id):
         try: conn.close()
         except: pass
 
-def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, is_protected, excel_pass):
+def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, is_protected, excel_pass, force_mat=None, force_name=None):
     try:
         wb = openpyxl.Workbook()
-        target_mat = rf(user_records[0], 'matricula') if user_records else None
+        target_mat = force_mat if force_mat else (rf(user_records[0], 'matricula') if user_records else None)
         user_workload = workload_map.get(target_mat, '40h') or '40h'
         try:
             user_workload_clean = str(user_workload).lower().replace('h','')
@@ -1991,7 +1991,7 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
         except:
             daily_hours = 8
         user_cargo = cargo_map.get(target_mat, 'xxx')
-        user_name = rf(user_records[0], 'name') if user_records else "Desconhecido"
+        user_name = force_name if force_name else (rf(user_records[0], 'name') if user_records else "Desconhecido")
         
         m_year = datetime.datetime.now().year
         if target_year_arg:
@@ -2352,18 +2352,42 @@ def _generate_excel_response(target_user_id, target_year_arg=None, is_protected=
             # Zip multiple files
             memory_file = BytesIO()
             with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
-                # Group records by matricula
+                # Get all users to ensure everyone is included in the ZIP, even those without records
+                all_users = []
+                try:
+                    u_conn = get_db_connection()
+                    u_cur = u_conn.cursor()
+                    u_nolock = "" if isinstance(u_conn, sqlite3.Connection) else "WITH (NOLOCK)"
+                    u_cur.execute(f"SELECT matricula, name, role FROM Users {u_nolock}")
+                    all_users = u_cur.fetchall()
+                    u_conn.close()
+                except Exception as e:
+                    print(f"Error fetching users for zip: {e}")
+
+                # Group existing records by matricula
                 groups = {}
                 for r in rows:
                     mat = rf(r, 'matricula')
                     groups.setdefault(mat, []).append(r)
                 
-                for mat, user_rows in groups.items():
+                # If we couldn't get the users list for some reason, fallback to grouping keys
+                if not all_users:
+                    all_users = [{'matricula': mat, 'name': mat, 'role': 'user'} for mat in groups.keys()]
+                
+                for u_row in all_users:
+                    mat = rf(u_row, 'matricula')
+                    u_name = rf(u_row, 'name')
+                    u_role = rf(u_row, 'role')
+                    
+                    if mat in ['admin', 'Gerencial', 'gerencial']:
+                        continue # Skip system admin accounts
+                        
+                    user_rows = groups.get(mat, [])
                     user_records = list(user_rows)
                     user_records.reverse()
                     try:
-                        out_wb = build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, is_protected, excel_pass)
-                        user_n = rf(user_records[0], 'name') or mat
+                        out_wb = build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, is_protected, excel_pass, force_mat=mat, force_name=u_name)
+                        user_n = u_name or mat
                         # Replace invalid characters for filename
                         safe_name = "".join([c for c in user_n if c.isalpha() or c.isdigit() or c in ' -_']).rstrip()
                         fname = f"Ponto - {safe_name}.xlsx"
