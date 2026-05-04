@@ -765,7 +765,7 @@ def punch(curr_user_mat, role):
              if r: user_cargo = r[0] or 'Funcionario'
     except: pass
     
-    is_retro_flag = 1 if any(word in data['type'].lower() for word in ['atestado', 'abono', 'férias', 'ferias', 'compensação', 'compensacao', 'justificativa', 'uso de saldo']) else 0
+    is_retro_flag = 1 if any(word in data['type'].lower() for word in ['atestado', 'abono', 'férias', 'ferias', 'compensação', 'compensacao', 'justificativa', 'uso de saldo', 'tre']) else 0
     justification_val = "Lançado via Registro Rápido" if is_retro_flag else None
 
     # If using SQL Server OR if we are in local VS Code mode (USE_SQLITE is true)
@@ -1186,7 +1186,7 @@ def delete_punch_by_user(curr_user_mat, role, transaction_id):
         if mat != curr_user_mat and role != 'admin':
             return jsonify({'message': 'Sem permissão para deletar este registro.'}), 403
             
-        allowed_types = ['Férias', 'Abono', 'Abono (Dia Todo)', 'Atestado', 'Atestado (Dia Todo)', 'Compensação', 'Uso de Saldo']
+        allowed_types = ['Férias', 'Abono', 'Abono (Dia Todo)', 'Atestado', 'Atestado (Dia Todo)', 'Compensação', 'Uso de Saldo', 'TRE']
         if rtype not in allowed_types:
             return jsonify({'message': 'Este tipo de registro não pode ser cancelado pelo usuário.'}), 400
             
@@ -1862,16 +1862,18 @@ def get_previous_years_balance(user_records, m_year, daily_hours):
         punches = days_map.get(curr_date, [])
         has_atestado = False
         has_abono = False
+        has_tre = False
         
         real_punches = []
         for p in punches:
             t_str = (p['type'] or "").lower()
             if 'atestado' in t_str and 'dia todo' in t_str: has_atestado = True
             elif 'abono' in t_str and 'dia todo' in t_str: has_abono = True
-            elif 'compensação' in t_str or 'compensacao' in t_str or 'saldo' in t_str or 'abono' in t_str or 'atestado' in t_str: pass
+            elif 'tre' in t_str: has_tre = True
+            elif 'compensação' in t_str or 'compensacao' in t_str or 'saldo' in t_str or 'abono' in t_str or 'atestado' in t_str or 'tre' in t_str: pass
             else: real_punches.append(p)
             
-        if has_atestado or has_abono:
+        if has_atestado or has_abono or has_tre:
             expected_sec = 0
             
         final_punches = []
@@ -2100,6 +2102,7 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                     has_abono = False
                     has_ferias = False
                     has_comp = False
+                    has_tre = False
                     ent_m, sai_m, ent_t, sai_t, ent_x, sai_x = None, None, None, None, None, None
                     
                     if len(punches) > 0:
@@ -2110,19 +2113,21 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                             if t_val is None: continue 
                             
                             t_str = (p['type'] or "").lower()
-                            if any(x in t_str for x in ['compens', 'saldo', 'uso', 'abono', 'atestat', 'férias', 'ferias']):
+                            if any(x in t_str for x in ['compens', 'saldo', 'uso', 'abono', 'atestat', 'férias', 'ferias', 'tre']):
                                 if 'atestado' in t_str and 'dia todo' in t_str:
                                     has_atestado = True
                                 elif 'abono' in t_str and 'dia todo' in t_str:
                                     has_abono = True
                                 elif 'férias' in t_str or 'ferias' in t_str:
                                     has_ferias = True
+                                elif 'tre' in t_str:
+                                    has_tre = True
                                 else:
                                     has_comp = True
                             else:
                                 real_punches.append(p)
                         
-                        if has_atestado or has_abono or has_comp or has_ferias:
+                        if has_atestado or has_abono or has_comp or has_ferias or has_tre:
                             pass 
                         
                         final_punches = []
@@ -2205,10 +2210,11 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                     daily_sec = daily_hours * 3600
                     deficit_sec = max(0, daily_sec - w_sec)
 
-                    if has_atestado or has_abono or has_comp or has_ferias:
-                        if has_atestado or has_abono or has_ferias:
+                    if has_atestado or has_abono or has_comp or has_ferias or has_tre:
+                        if has_atestado or has_abono or has_ferias or has_tre:
                             if has_atestado: val_str = "ATESTADO"
                             elif has_abono: val_str = "ABONO"
+                            elif has_tre: val_str = "TRE"
                             else: val_str = "FÉRIAS"
                             ws.cell(row=row_idx, column=6, value=val_str)
                             ws.cell(row=row_idx, column=7, value=val_str)
