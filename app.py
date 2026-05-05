@@ -1983,13 +1983,13 @@ def get_previous_years_balance(user_records, m_year, daily_hours):
             
         for p in ext_p:
             t_str = (p['type'] or "").lower()
-            if 'saída extra' in t_str or 'saida extra' in t_str: ent_x = p['time']
-            elif 'entrada extra' in t_str: sai_x = p['time']
+            if 'saída extra' in t_str or 'saida extra' in t_str: sai_x = p['time']
+            elif 'entrada extra' in t_str: ent_x = p['time']
             
         worked_sec = 0
         if ent_m and sai_m: worked_sec += (sai_m - ent_m).total_seconds()
         if ent_t and sai_t: worked_sec += (sai_t - ent_t).total_seconds()
-        if ent_x and sai_x: worked_sec -= (sai_x - ent_x).total_seconds()
+        if ent_x and sai_x: worked_sec -= (ent_x - sai_x).total_seconds()
         
         total_sec += (worked_sec - expected_sec)
         curr_date += datetime.timedelta(days=1)
@@ -2154,8 +2154,8 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                 m = int((daily_hours - h) * 60)
                 ws['L7'] = datetime.time(h, m)
                 ws['N9'] = m_year
-                ws['J13'] = 'entrada EXTRA'
-                ws['K13'] = 'saída EXTRA'
+                ws['J13'] = 'saída EXTRA'
+                ws['K13'] = 'entrada EXTRA'
                 
                 m_key = f"{m_year}-{m_num:02d}"
                 month_data = months_data.get(m_key, {"days": {}})
@@ -2243,9 +2243,9 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                         for p in extra_punches:
                             t_val = p['time'].time() if isinstance(p['time'], datetime.datetime) else None
                             t_str = (p['type'] or "").lower()
-                            if 'entrada extra' in t_str:
+                            if 'saída extra' in t_str or 'saida extra' in t_str:
                                 ent_x = t_val
-                            elif 'saída extra' in t_str or 'saida extra' in t_str:
+                            elif 'entrada extra' in t_str:
                                 sai_x = t_val
                     
                     if has_comp:
@@ -2260,7 +2260,7 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                     ws.cell(row=row_idx, column=10, value=ent_x if ent_x is not None else "").number_format = 'hh:mm:ss'
                     ws.cell(row=row_idx, column=11, value=sai_x if sai_x is not None else "").number_format = 'hh:mm:ss'
                     
-                    ws.cell(row=row_idx, column=12, value=f'=IF(A{row_idx}="U",(G{row_idx}-F{row_idx})+(I{row_idx}-H{row_idx})+(K{row_idx}-J{row_idx}),"NÃO ÚTIL")')
+                    ws.cell(row=row_idx, column=12, value=f'=IF(A{row_idx}="U",(G{row_idx}-F{row_idx})+(I{row_idx}-H{row_idx})-(K{row_idx}-J{row_idx}),"NÃO ÚTIL")')
 
                     def t_to_s(t):
                         if t is None: return 0
@@ -2269,7 +2269,7 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                     w_sec = 0
                     if ent_m and sai_m: w_sec += max(0, t_to_s(sai_m) - t_to_s(ent_m))
                     if ent_t and sai_t: w_sec += max(0, t_to_s(sai_t) - t_to_s(ent_t))
-                    if ent_x and sai_x: w_sec += max(0, t_to_s(sai_x) - t_to_s(ent_x))
+                    if ent_x and sai_x: w_sec -= max(0, t_to_s(sai_x) - t_to_s(ent_x))
                     
                     daily_sec = daily_hours * 3600
                     deficit_sec = max(0, daily_sec - w_sec)
