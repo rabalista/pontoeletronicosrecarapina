@@ -1133,7 +1133,10 @@
                     suffix += ` <button onclick="cancelRecord('${r.transaction_id}', this)" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-error/10 text-error hover:bg-error hover:text-white ml-2 transition-colors border border-error/20" title="Cancelar este registro">❌ Cancelar</button>`;
                 }
                 
+                const isCanceled = (r.type || "").toLowerCase().includes('cancelado');
                 const tr = document.createElement('tr');
+                if (isCanceled) tr.className = "opacity-40 line-through text-on-surface-variant";
+                
                 tr.innerHTML = `<td>${r.type}${suffix}</td><td>${r.timestamp}</td><td>${r.neighborhood || '-'}</td><td>${r.city || '-'}</td>`;
                 tbody.appendChild(tr);
             });
@@ -1513,6 +1516,7 @@
                 };
 
                 let e1 = "", s1 = "", e2 = "", s2 = "";
+                let validIdx = 0;
                 realPunches.forEach(p => {
                     let timeStr = formatTime(p);
                     if (!timeStr) return;
@@ -1520,16 +1524,11 @@
                     const tLow = t.toLowerCase();
                     if (tLow.includes('saldo') || tLow.includes('compens') || tLow.includes('atestado') || tLow.includes('abono') || tLow.includes('férias') || tLow.includes('ferias') || tLow.includes('extra') || tLow.includes('3º turno') || tLow.includes('tre')) return;
                     
-                    if (t === "Entrada" && !e1) e1 = timeStr;
-                    else if ((t === "Saída Almoço" || t === "Saida Almoco") && !s1) s1 = timeStr;
-                    else if ((t === "Volta Almoço" || t === "Volta Almoco") && !e2) e2 = timeStr;
-                    else if ((t === "Saída" || t === "Saida") && !s2) s2 = timeStr;
-                    else {
-                        if (!e1) e1 = timeStr;
-                        else if (!s1) s1 = timeStr;
-                        else if (!e2) e2 = timeStr;
-                        else if (!s2) s2 = timeStr;
-                    }
+                    if (validIdx === 0) e1 = timeStr;
+                    else if (validIdx === 1) s1 = timeStr;
+                    else if (validIdx === 2) e2 = timeStr;
+                    else if (validIdx === 3) s2 = timeStr;
+                    validIdx++;
                 });
 
                 const isWeekend = d.getDay() === 0 || d.getDay() === 6;
@@ -1806,20 +1805,19 @@
                 };
 
                 let e1 = "", s1 = "", e2 = "", s2 = "";
+                let validIdx = 0;
                 realPunches.forEach(p => {
                     let timeStr = formatTime(p);
                     if (!timeStr) return;
                     const t = (p.type || "").trim();
-                    if (t === "Entrada" && !e1) e1 = timeStr;
-                    else if ((t === "Saída Almoço" || t === "Saida Almoco") && !s1) s1 = timeStr;
-                    else if ((t === "Volta Almoço" || t === "Volta Almoco") && !e2) e2 = timeStr;
-                    else if ((t === "Saída" || t === "Saida") && !s2) s2 = timeStr;
-                    else {
-                        if (!e1) e1 = timeStr;
-                        else if (!s1) s1 = timeStr;
-                        else if (!e2) e2 = timeStr;
-                        else if (!s2) s2 = timeStr;
-                    }
+                    const tLow = t.toLowerCase();
+                    if (tLow.includes('saldo') || tLow.includes('compens') || tLow.includes('atestado') || tLow.includes('abono') || tLow.includes('férias') || tLow.includes('ferias') || tLow.includes('extra') || tLow.includes('3º turno') || tLow.includes('tre')) return;
+
+                    if (validIdx === 0) e1 = timeStr;
+                    else if (validIdx === 1) s1 = timeStr;
+                    else if (validIdx === 2) e2 = timeStr;
+                    else if (validIdx === 3) s2 = timeStr;
+                    validIdx++;
                 });
 
                 let row = [

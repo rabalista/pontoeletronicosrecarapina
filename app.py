@@ -1598,6 +1598,85 @@ def delete_record(curr_user_mat, role, transaction_id):
         try: conn.close()
         except: pass
 
+@app.route('/api/admin/record/id/<int:record_id>', methods=['DELETE'])
+@token_required
+def delete_record_by_id(curr_user_mat, role, record_id):
+    if role != 'admin':
+        return jsonify({'message': 'Unauthorized'}), 401
+    conn = get_db_connection()
+    ph = get_ph(conn)
+    try:
+        cursor = conn.cursor()
+        
+        # Check current type first
+        cursor.execute(f"SELECT record_type, transaction_id FROM TimeRecords WHERE id = {ph}", (record_id,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({'message': 'Registro não encontrado.'}), 404
+        
+        rtype = rf(row, 'record_type')
+        tid = rf(row, 'transaction_id')
+        
+        special_types = ['Férias', 'Abono', 'Abono (Dia Todo)', 'Atestado', 'Atestado (Dia Todo)', 'Compensação', 'Uso de Saldo', 'TRE', 'férias', 'ferias']
+        is_special = any(t.lower() in (rtype or "").lower() for t in special_types)
+        
+        if is_special:
+            new_type = f"Cancelado pelo Admin - {rtype}"
+            cursor.execute(f"UPDATE TimeRecords SET record_type = {ph} WHERE id = {ph}", (new_type, record_id))
+        else:
+            cursor.execute(f"DELETE FROM TimeRecords WHERE id = {ph}", (record_id,))
+
+        if isinstance(conn, sqlite3.Connection) or ph == '?':
+            conn.commit()
+            
+        try:
+            sconn = sqlite3.connect(sqlite_path)
+            if is_special:
+                sconn.execute("UPDATE TimeRecords SET record_type = ? WHERE id = ?", (f"Cancelado pelo Admin - {rtype}", record_id))
+            else:
+                sconn.execute("DELETE FROM TimeRecords WHERE id = ?", (record_id,))
+            sconn.commit()
+            sconn.close()
+        except: pass
+        
+        msg = 'Registro cancelado com sucesso!' if is_special else 'Registro excluído com sucesso!'
+        return jsonify({'message': msg})
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
+@app.route('/api/admin/history/<matricula>', methods=['GET'])
+@token_required
+def get_user_history_admin(curr_user_mat, role, matricula):
+    if role != 'admin':
+        return jsonify({'message': 'Unauthorized'}), 401
+    conn = get_db_connection()
+    ph = get_ph(conn)
+    try:
+        cursor = conn.cursor()
+        is_sq = isinstance(conn, sqlite3.Connection)
+        top_clause = "" if is_sq else "TOP 100"
+        limit_clause = "LIMIT 100" if is_sq else ""
+        cursor.execute(f"SELECT {top_clause} id, transaction_id, user_name, record_type, timestamp, is_retroactive, is_reviewed, justification FROM TimeRecords WHERE matricula = {ph} ORDER BY timestamp DESC {limit_clause}", (matricula,))
+        rows = cursor.fetchall()
+        
+        records = []
+        for r in rows:
+            if isinstance(r, dict):
+                records.append(dict(r))
+            else:
+                columns = [column[0] for column in cursor.description]
+                records.append(dict(zip(columns, r)))
+                
+        return jsonify(records)
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
 @app.route('/api/admin/clear_records', methods=['POST'])
 @token_required
 def admin_clear_records(curr_user_mat, role):
@@ -1867,6 +1946,8 @@ def get_previous_years_balance(user_records, m_year, daily_hours):
         real_punches = []
         for p in punches:
             t_str = (p['type'] or "").lower()
+            if 'cancelado' in t_str: continue
+
             if 'atestado' in t_str and 'dia todo' in t_str: has_atestado = True
             elif 'abono' in t_str and 'dia todo' in t_str: has_abono = True
             elif 'tre' in t_str: has_tre = True
@@ -1885,7 +1966,7 @@ def get_previous_years_balance(user_records, m_year, daily_hours):
             
         for t, pts in grouped.items():
             appr = [p for p in pts if p.get('is_retroactive') and p.get('is_reviewed')]
-            if appr: final_punches.extend(appr)
+            if appr: final_punches.append(appr[-1])
             else: final_punches.extend(pts)
             
         final_punches.sort(key=lambda x: x['time'])
@@ -2113,6 +2194,8 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                             if t_val is None: continue 
                             
                             t_str = (p['type'] or "").lower()
+                            if 'cancelado' in t_str: continue
+
                             if any(x in t_str for x in ['compens', 'saldo', 'uso', 'abono', 'atestat', 'férias', 'ferias', 'tre']):
                                 if 'atestado' in t_str and 'dia todo' in t_str:
                                     has_atestado = True
@@ -2141,7 +2224,7 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                         for t, pts in grouped_by_type.items():
                             approved_retros = [p for p in pts if p.get('is_retroactive') and p.get('is_reviewed')]
                             if approved_retros:
-                                final_punches.extend(approved_retros)
+                                final_punches.append(approved_retros[-1])
                             else:
                                 final_punches.extend(pts)
                         
@@ -2150,31 +2233,12 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                         standard_punches = [p for p in final_punches if '3º turno' not in (p['type'] or "").lower()]
                         extra_punches = [p for p in final_punches if '3º turno' in (p['type'] or "").lower()]
                         
-                        assigned_indices = set()
-                        for i, p in enumerate(standard_punches):
+                        for i, p in enumerate(standard_punches[:4]):
                             t_val = p['time'].time() if isinstance(p['time'], datetime.datetime) else None
-                            t_str = (p['type'] or "").lower()
-                            
-                            if 'entrada' in t_str and ent_m is None and 'extra' not in t_str and 'volta' not in t_str:
-                                ent_m = t_val
-                                assigned_indices.add(i)
-                            elif ('saída almoço' in t_str or 'saida almoco' in t_str) and sai_m is None:
-                                sai_m = t_val
-                                assigned_indices.add(i)
-                            elif ('volta almoço' in t_str or 'volta almoco' in t_str) and ent_t is None:
-                                ent_t = t_val
-                                assigned_indices.add(i)
-                            elif 'saída' in t_str and sai_t is None and 'extra' not in t_str and 'almoço' not in t_str and 'almoco' not in t_str:
-                                sai_t = t_val
-                                assigned_indices.add(i)
-
-                        unassigned_punches = [p for i, p in enumerate(standard_punches) if i not in assigned_indices]
-                        for p in unassigned_punches:
-                            t_val = p['time'].time() if isinstance(p['time'], datetime.datetime) else None
-                            if ent_m is None: ent_m = t_val
-                            elif sai_m is None: sai_m = t_val
-                            elif ent_t is None: ent_t = t_val
-                            elif sai_t is None: sai_t = t_val
+                            if i == 0: ent_m = t_val
+                            elif i == 1: sai_m = t_val
+                            elif i == 2: ent_t = t_val
+                            elif i == 3: sai_t = t_val
                         
                         for p in extra_punches:
                             t_val = p['time'].time() if isinstance(p['time'], datetime.datetime) else None
