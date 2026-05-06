@@ -1681,10 +1681,19 @@ def delete_record_by_id(curr_user_mat, role, record_id):
             
         try:
             sconn = sqlite3.connect(sqlite_path)
-            if is_special:
-                sconn.execute("UPDATE TimeRecords SET record_type = ? WHERE id = ?", (f"Cancelado pelo Admin - {rtype}", record_id))
+            # Use transaction_id for local mirror if available to avoid ID mismatch sync issues
+            if tid:
+                if is_special:
+                    sconn.execute("UPDATE TimeRecords SET record_type = ? WHERE transaction_id = ?", (f"Cancelado pelo Admin - {rtype}", tid))
+                else:
+                    sconn.execute("DELETE FROM TimeRecords WHERE transaction_id = ?", (tid,))
             else:
-                sconn.execute("DELETE FROM TimeRecords WHERE id = ?", (record_id,))
+                # Fallback to id for legacy records without transaction_id
+                if is_special:
+                    sconn.execute("UPDATE TimeRecords SET record_type = ? WHERE id = ?", (f"Cancelado pelo Admin - {rtype}", record_id))
+                else:
+                    sconn.execute("DELETE FROM TimeRecords WHERE id = ?", (record_id,))
+            
             if target_matricula:
                 sconn.execute("UPDATE Users SET must_clear_cache = 1 WHERE matricula = ?", (target_matricula,))
             sconn.commit()

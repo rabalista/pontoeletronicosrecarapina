@@ -716,7 +716,7 @@
                         <td class="px-6 py-4 text-sm font-bold">${r.record_type || ''}</td>
                         <td class="px-6 py-4 text-sm">${isRetro}${justText}</td>
                         <td class="px-6 py-4 text-right">
-                            <button class="p-2 text-error hover:bg-error-container/30 rounded-lg transition-colors" onclick="deleteHistoryRecord(${r.id})" title="Excluir"><span class="material-symbols-outlined text-lg">delete</span></button>
+                            <button class="p-2 text-error hover:bg-error-container/30 rounded-lg transition-colors" onclick="deleteHistoryRecord(${r.id}, '${r.transaction_id || ''}')" title="Excluir"><span class="material-symbols-outlined text-lg">delete</span></button>
                         </td>
                     `;
                     tbody.appendChild(tr);
@@ -726,11 +726,13 @@
             }
         }
 
-        async function deleteHistoryRecord(recordId) {
+        async function deleteHistoryRecord(recordId, transactionId) {
             if(!confirm("Deseja realmente EXCLUIR esta batida específica do usuário? Esta ação não pode ser desfeita.")) return;
             const token = localStorage.getItem('ponto_token');
             try {
-                const res = await apiFetch(`/api/admin/record/id/${recordId}`, {
+                // Prefer transaction_id based deletion as it is more robust across mirrors
+                let url = transactionId ? `/api/admin/record/${transactionId}` : `/api/admin/record/id/${recordId}`;
+                const res = await apiFetch(url, {
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
