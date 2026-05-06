@@ -723,22 +723,27 @@ def punch(curr_user_mat, role):
             if transaction_id:
                 curs.execute(f"SELECT id FROM {table_name} WHERE transaction_id = {p}", (transaction_id,))
                 if curs.fetchone():
-                    print(f"DEBUG: Duplicate found by transaction_id={transaction_id} in {table_name}")
-                    return True
+                    return 'tx_duplicate'
             today_start = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
             q = f"SELECT {'TOP 1 id' if not is_sq else 'id'} FROM {table_name} {'WITH (NOLOCK)' if not is_sq else ''} WHERE matricula = {p} AND record_type = {p} AND timestamp >= {p} {'LIMIT 1' if is_sq else ''}"
             curs.execute(q, (user_matricula, data['type'], today_start))
             if curs.fetchone():
-                print(f"DEBUG: Daily duplicate found for {user_matricula} ({data['type']}) in {table_name}")
-                return True
+                return 'daily_duplicate'
         except Exception as e:
-            print(f"DEBUG: Error in check_exists_robust: {e}")
-        return False
+            pass
+        return None
 
-    if check_exists_robust(conn, "TimeRecords"): return jsonify({'message': 'Ponto já registrado!'}), 409
+    res_primary = check_exists_robust(conn, "TimeRecords")
+    if res_primary == 'tx_duplicate': return jsonify({'message': 'Ponto já registrado!'}), 409
+    if res_primary == 'daily_duplicate': return jsonify({'message': 'Ponto já registrado! Em caso de erro, entre no sistema e use "Corrigir Ponto".'}), 409
+    
     qconn_chk = sqlite3.connect(sqlite_path)
-    if check_exists_robust(qconn_chk, "OfflineQueue") or check_exists_robust(qconn_chk, "TimeRecords"):
+    res_off = check_exists_robust(qconn_chk, "OfflineQueue")
+    res_loc = check_exists_robust(qconn_chk, "TimeRecords")
+    if res_off == 'tx_duplicate' or res_loc == 'tx_duplicate':
         qconn_chk.close(); return jsonify({'message': 'Ponto já registrado!'}), 409
+    if res_off == 'daily_duplicate' or res_loc == 'daily_duplicate':
+        qconn_chk.close(); return jsonify({'message': 'Ponto já registrado! Em caso de erro, entre no sistema e use "Corrigir Ponto".'}), 409
     qconn_chk.close()
     # --- END ATOMIC PROTECTION ---
 
@@ -1551,6 +1556,31 @@ def approve_retroactive_punch(curr_user_mat, role, transaction_id):
     ph = get_ph(conn)
     try:
         cursor = conn.cursor()
+        
+        cursor.execute(f"SELECT matricula, record_type, timestamp FROM TimeRecords WHERE transaction_id = {ph}", (transaction_id,))
+        row = cursor.fetchone()
+        
+        if row:
+            mat = rf(row, 'matricula')
+            rtype = rf(row, 'record_type')
+            ts = rf(row, 'timestamp')
+            
+            if isinstance(ts, str):
+                try: 
+                    if '.' in ts: ts = datetime.datetime.strptime(ts, '%Y-%m-%d %H:%M:%S.%f')
+                    else: ts = datetime.datetime.strptime(ts, '%Y-%m-%d %H:%M:%S')
+                except: pass
+            
+            if isinstance(ts, datetime.datetime):
+                day_start = ts.replace(hour=0, minute=0, second=0, microsecond=0)
+                next_day = day_start + datetime.timedelta(days=1)
+                
+                del_q = f"DELETE FROM TimeRecords WHERE matricula = {ph} AND record_type = {ph} AND timestamp >= {ph} AND timestamp < {ph} AND transaction_id != {ph}"
+                cursor.execute(del_q, (mat, rtype, day_start, next_day, transaction_id))
+            
+            try: cursor.execute(f"UPDATE Users SET must_clear_cache = 1 WHERE matricula = {ph}", (mat,))
+            except: pass
+
         cursor.execute(f"UPDATE TimeRecords SET is_reviewed = 1 WHERE transaction_id = {ph}", (transaction_id,))
         if isinstance(conn, sqlite3.Connection) or ph == '?':
             conn.commit()
@@ -1558,6 +1588,10 @@ def approve_retroactive_punch(curr_user_mat, role, transaction_id):
         # Also mirror to local sqlite if online
         try:
             sconn = sqlite3.connect(sqlite_path)
+            if row and isinstance(ts, datetime.datetime):
+                sconn.execute("DELETE FROM TimeRecords WHERE matricula = ? AND record_type = ? AND timestamp >= ? AND timestamp < ? AND transaction_id != ?", 
+                              (mat, rtype, day_start, next_day, transaction_id))
+                sconn.execute("UPDATE Users SET must_clear_cache = 1 WHERE matricula = ?", (mat,))
             sconn.execute("UPDATE TimeRecords SET is_reviewed = 1 WHERE transaction_id = ?", (transaction_id,))
             sconn.commit()
             sconn.close()
@@ -1579,7 +1613,16 @@ def delete_record(curr_user_mat, role, transaction_id):
     ph = get_ph(conn)
     try:
         cursor = conn.cursor()
+        cursor.execute(f"SELECT matricula FROM TimeRecords WHERE transaction_id = {ph}", (transaction_id,))
+        row = cursor.fetchone()
+        target_matricula = rf(row, 'matricula') if row else None
+        
         cursor.execute(f"DELETE FROM TimeRecords WHERE transaction_id = {ph}", (transaction_id,))
+        
+        if target_matricula:
+            try: cursor.execute(f"UPDATE Users SET must_clear_cache = 1 WHERE matricula = {ph}", (target_matricula,))
+            except: pass
+            
         if isinstance(conn, sqlite3.Connection) or ph == '?':
             conn.commit()
             
@@ -1587,6 +1630,8 @@ def delete_record(curr_user_mat, role, transaction_id):
         try:
             sconn = sqlite3.connect(sqlite_path)
             sconn.execute("DELETE FROM TimeRecords WHERE transaction_id = ?", (transaction_id,))
+            if target_matricula:
+                sconn.execute("UPDATE Users SET must_clear_cache = 1 WHERE matricula = ?", (target_matricula,))
             sconn.commit()
             sconn.close()
         except: pass
@@ -1609,13 +1654,14 @@ def delete_record_by_id(curr_user_mat, role, record_id):
         cursor = conn.cursor()
         
         # Check current type first
-        cursor.execute(f"SELECT record_type, transaction_id FROM TimeRecords WHERE id = {ph}", (record_id,))
+        cursor.execute(f"SELECT matricula, record_type, transaction_id FROM TimeRecords WHERE id = {ph}", (record_id,))
         row = cursor.fetchone()
         if not row:
             return jsonify({'message': 'Registro não encontrado.'}), 404
         
         rtype = rf(row, 'record_type')
         tid = rf(row, 'transaction_id')
+        target_matricula = rf(row, 'matricula')
         
         special_types = ['Férias', 'Abono', 'Abono (Dia Todo)', 'Atestado', 'Atestado (Dia Todo)', 'Compensação', 'Uso de Saldo', 'TRE', 'férias', 'ferias']
         is_special = any(t.lower() in (rtype or "").lower() for t in special_types)
@@ -1626,6 +1672,10 @@ def delete_record_by_id(curr_user_mat, role, record_id):
         else:
             cursor.execute(f"DELETE FROM TimeRecords WHERE id = {ph}", (record_id,))
 
+        if target_matricula:
+            try: cursor.execute(f"UPDATE Users SET must_clear_cache = 1 WHERE matricula = {ph}", (target_matricula,))
+            except: pass
+
         if isinstance(conn, sqlite3.Connection) or ph == '?':
             conn.commit()
             
@@ -1635,6 +1685,8 @@ def delete_record_by_id(curr_user_mat, role, record_id):
                 sconn.execute("UPDATE TimeRecords SET record_type = ? WHERE id = ?", (f"Cancelado pelo Admin - {rtype}", record_id))
             else:
                 sconn.execute("DELETE FROM TimeRecords WHERE id = ?", (record_id,))
+            if target_matricula:
+                sconn.execute("UPDATE Users SET must_clear_cache = 1 WHERE matricula = ?", (target_matricula,))
             sconn.commit()
             sconn.close()
         except: pass
@@ -2222,11 +2274,12 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                             grouped_by_type[t].append(p)
                         
                         for t, pts in grouped_by_type.items():
-                            approved_retros = [p for p in pts if p.get('is_retroactive') and p.get('is_reviewed')]
+                            valid_pts = [p for p in pts if not p.get('is_retroactive') or p.get('is_reviewed')]
+                            approved_retros = [p for p in valid_pts if p.get('is_retroactive')]
                             if approved_retros:
                                 final_punches.append(approved_retros[-1])
                             else:
-                                final_punches.extend(pts)
+                                final_punches.extend(valid_pts)
                         
                         final_punches.sort(key=lambda x: x['time'])
                         
@@ -2244,9 +2297,9 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                             t_val = p['time'].time() if isinstance(p['time'], datetime.datetime) else None
                             t_str = (p['type'] or "").lower()
                             if 'saída extra' in t_str or 'saida extra' in t_str:
-                                ent_x = t_val
-                            elif 'entrada extra' in t_str:
                                 sai_x = t_val
+                            elif 'entrada extra' in t_str:
+                                ent_x = t_val
                     
                     if has_comp:
                         if ent_m is not None and sai_m is None: sai_m = ent_m
