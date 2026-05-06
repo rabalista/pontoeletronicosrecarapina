@@ -746,6 +746,36 @@ def punch(curr_user_mat, role):
         qconn_chk.close(); return jsonify({'message': 'Ponto já registrado! Em caso de erro, entre no sistema e use "Corrigir Ponto".'}), 409
     qconn_chk.close()
     # --- END ATOMIC PROTECTION ---
+    
+    # --- PUNCH SEQUENCE VALIDATION (v16.2) ---
+    # Ensures Entrada -> Saída Almoço -> Volta Almoço -> Saída
+    target_type = data.get('type')
+    if target_type in ['Saída Almoço', 'Volta Almoço', 'Saída']:
+        today_start = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
+        existing_types = set()
+        
+        def fetch_types(db_conn, table_name):
+            try:
+                curs = db_conn.cursor()
+                is_sq = isinstance(db_conn, sqlite3.Connection); p = get_ph(db_conn)
+                q = f"SELECT record_type FROM {table_name} {'WITH (NOLOCK)' if not is_sq else ''} WHERE matricula = {p} AND timestamp >= {p}"
+                curs.execute(q, (user_matricula, today_start))
+                return { (r[0] if isinstance(r, (tuple, list)) else r['record_type']) for r in curs.fetchall() }
+            except: return set()
+
+        existing_types.update(fetch_types(conn, "TimeRecords"))
+        qconn_seq = sqlite3.connect(sqlite_path); qconn_seq.row_factory = sqlite3.Row
+        existing_types.update(fetch_types(qconn_seq, "OfflineQueue"))
+        existing_types.update(fetch_types(qconn_seq, "TimeRecords"))
+        qconn_seq.close()
+
+        if target_type == 'Saída Almoço' and 'Entrada' not in existing_types:
+            return jsonify({'message': 'Você não bateu a entrada! Registre a entrada primeiro.'}), 400
+        if target_type == 'Volta Almoço' and 'Saída Almoço' not in existing_types:
+            return jsonify({'message': 'Você não bateu a saída para o almoço! Registre o almoço primeiro.'}), 400
+        if target_type == 'Saída' and 'Volta Almoço' not in existing_types:
+            return jsonify({'message': 'Você não bateu a volta do almoço! Registre a volta primeiro.'}), 400
+    # --- END SEQUENCE VALIDATION ---
 
     # 1. Try Online Insert if applicable
     inserted_online = False
