@@ -1598,6 +1598,11 @@
                                 mObs.push("COMPENSAÇÃO / USO DE SALDO");
                                 hasComp = true;
                             }
+                            
+                            // Include custom justification if present
+                            if (r.justification && r.justification !== "Lançado via Registro Rápido" && !mObs.includes(r.justification.toUpperCase())) {
+                                mObs.push(r.justification.toUpperCase());
+                            }
                         }
                     });
 

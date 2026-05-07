@@ -838,7 +838,8 @@
                         accuracy: punchData.accuracy,
                         full_address: punchData.full_address,
                         transaction_id: punchData.transaction_id,
-                        matricula: getMatricula()
+                        matricula: getMatricula(),
+                        justification: punchData.justification
                     }
                 );
                 if (r && r.ok) {

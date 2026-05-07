@@ -111,7 +111,8 @@ function offlinePunchAdd(type, neighborhood, city, extra = {}) {
     longitude: extra.longitude,
     accuracy: extra.accuracy,
     full_address: extra.full_address,
-    transaction_id: extra.transaction_id || ('txn_off_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9))
+    transaction_id: extra.transaction_id || ('txn_off_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)),
+    justification: extra.justification || ""
   });
   setOfflineQueue(q);
   return { ok: true };
@@ -168,7 +169,8 @@ async function offlineSync(token) {
           longitude: r.longitude,
           accuracy: r.accuracy,
           full_address: r.full_address,
-          transaction_id: r.transaction_id
+          transaction_id: r.transaction_id,
+          justification: r.justification || ""
         }),
       });
       if (res.ok || res.status === 409) {
