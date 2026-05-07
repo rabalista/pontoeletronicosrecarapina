@@ -1132,12 +1132,13 @@ def history(curr_user_mat, role):
                         ts = ts.strftime('%Y-%m-%d %H:%M:%S')
                     tx_id = rf(row, 'transaction_id')
                     tx_id_str = str(tx_id) if tx_id else None
-                    key = (rf(row, 'record_type'), str(ts).split('.')[0])
+                    key = str(ts).split('.')[0]
                     if key not in seen and (not tx_id_str or tx_id_str not in seen):
                         seen.add(key)
                         if tx_id_str: seen.add(tx_id_str)
-                        records.append({
-                            'type': rf(row, 'record_type'),
+                        if 'cancelado' not in str(rf(row, 'record_type') or '').lower():
+                            records.append({
+                                'type': rf(row, 'record_type'),
                             'timestamp': ts,
                             'neighborhood': rf(row, 'neighborhood'),
                             'city': rf(row, 'city'),
@@ -1173,12 +1174,13 @@ def history(curr_user_mat, role):
                     ts = ts.strftime('%Y-%m-%d %H:%M:%S')
                 tx_id = rf(row, 'transaction_id')
                 tx_id_str = str(tx_id) if tx_id else None
-                key = (rf(row, 'record_type'), str(ts).split('.')[0])
+                key = str(ts).split('.')[0]
                 if key not in seen and (not tx_id_str or tx_id_str not in seen):
                     seen.add(key)
                     if tx_id_str: seen.add(tx_id_str)
-                    records.append({
-                        'type': rf(row, 'record_type'),
+                    if 'cancelado' not in str(rf(row, 'record_type') or '').lower():
+                        records.append({
+                            'type': rf(row, 'record_type'),
                         'timestamp': ts,
                         'neighborhood': rf(row, 'neighborhood'),
                         'city': rf(row, 'city'),
@@ -1258,13 +1260,13 @@ def delete_punch_by_user(curr_user_mat, role, transaction_id):
             return jsonify({'message': 'Este tipo de registro não pode ser cancelado pelo usuário.'}), 400
             
         new_type = f"Cancelado - {rtype}"
-        cursor.execute(f"UPDATE TimeRecords SET record_type = {ph} WHERE transaction_id = {ph}", (new_type, transaction_id))
+        cursor.execute(f"UPDATE TimeRecords SET record_type = {ph}, justification = NULL, document_path = NULL WHERE transaction_id = {ph}", (new_type, transaction_id))
         if is_sqlite or ph == '?': conn.commit()
         
         try:
             sconn = sqlite3.connect(sqlite_path)
             scur = sconn.cursor()
-            scur.execute("UPDATE TimeRecords SET record_type = ? WHERE transaction_id = ?", (new_type, transaction_id))
+            scur.execute("UPDATE TimeRecords SET record_type = ?, justification = NULL, document_path = NULL WHERE transaction_id = ?", (new_type, transaction_id))
             sconn.commit()
             sconn.close()
         except: pass
@@ -1730,7 +1732,7 @@ def delete_record_by_id(curr_user_mat, role, record_id):
         
         if is_special:
             new_type = f"Cancelado pelo Admin - {rtype}"
-            cursor.execute(f"UPDATE TimeRecords SET record_type = {ph} WHERE id = {ph}", (new_type, record_id))
+            cursor.execute(f"UPDATE TimeRecords SET record_type = {ph}, justification = NULL, document_path = NULL WHERE id = {ph}", (new_type, record_id))
         else:
             cursor.execute(f"DELETE FROM TimeRecords WHERE id = {ph}", (record_id,))
 
@@ -1746,13 +1748,13 @@ def delete_record_by_id(curr_user_mat, role, record_id):
             # Use transaction_id for local mirror if available to avoid ID mismatch sync issues
             if tid:
                 if is_special:
-                    sconn.execute("UPDATE TimeRecords SET record_type = ? WHERE transaction_id = ?", (f"Cancelado pelo Admin - {rtype}", tid))
+                    sconn.execute("UPDATE TimeRecords SET record_type = ?, justification = NULL, document_path = NULL WHERE transaction_id = ?", (f"Cancelado pelo Admin - {rtype}", tid))
                 else:
                     sconn.execute("DELETE FROM TimeRecords WHERE transaction_id = ?", (tid,))
             else:
                 # Fallback to id for legacy records without transaction_id
                 if is_special:
-                    sconn.execute("UPDATE TimeRecords SET record_type = ? WHERE id = ?", (f"Cancelado pelo Admin - {rtype}", record_id))
+                    sconn.execute("UPDATE TimeRecords SET record_type = ?, justification = NULL, document_path = NULL WHERE id = ?", (f"Cancelado pelo Admin - {rtype}", record_id))
                 else:
                     sconn.execute("DELETE FROM TimeRecords WHERE id = ?", (record_id,))
             
