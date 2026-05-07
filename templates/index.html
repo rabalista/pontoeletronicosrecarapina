@@ -120,26 +120,26 @@
         </div>
     </div>
 
-<main class="w-full flex-grow flex flex-col items-center justify-center px-4 py-4 max-w-[1200px]">
+<main class="w-full flex-grow flex flex-col items-center justify-center px-4 py-2 md:py-4 max-w-[1200px]">
 <!-- Header / Logo Area -->
-<header class="flex flex-col items-center mb-4 text-center w-full max-w-[420px]">
-<div class="w-20 h-20 mb-4 overflow-hidden flex items-center justify-center">
+<header class="flex flex-col items-center mb-1 md:mb-4 text-center w-full max-w-[420px]">
+<div class="w-12 h-12 md:w-16 md:h-16 mb-1 md:mb-4 overflow-hidden flex items-center justify-center">
 <img alt="Brasão do Governo do Estado do Espírito Santo" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida/ADBb0ujwUXmAORF3-O0cLGLsIa-4E53iDzP0DNXrwCgMPyGj5uz1iSpRcxp_a-wlm4EVx27ummyBLP-HinfBNpWEj9GN7kGPvpliicD15dU3KBxh5CzMMTm1XSSNnI-ORvaQoCMhBaOJbUgDxCighhv06iydT1H_iHVT6IQr4OkGIUFQUelbJnR5FTzJYY-bEPj2S1Snndvhrw8ctzrMbFQSJ3FZ9a7ft0MVMqNgRdmRePNGqhwsLKqpk0s24kYBC1jrNidvI5vPy4DKqQ" onerror="this.src='https://cdn.es.gov.br/images/logo/governo/brasao/center/Brasao_Governo_500.png'"/>
 </div>
 <!-- Digital Clock Hero Section -->
-<div class="space-y-1 w-full text-center">
-<h1 class="text-5xl font-black tracking-tighter text-primary-container font-headline" id="fastClock">
+<div class="space-y-0 md:space-y-1 w-full text-center">
+<h1 class="text-3xl md:text-5xl font-black tracking-tighter text-primary-container font-headline" id="fastClock">
                     00:00:00
                 </h1>
-<p class="text-on-surface-variant text-[10px] uppercase font-bold tracking-[0.2em] opacity-80" id="fastDate">
+<p class="text-on-surface-variant text-[9px] md:text-[10px] uppercase font-bold tracking-[0.2em] opacity-80" id="fastDate">
                     Carregando data...
                 </p>
 </div>
 </header>
 <!-- Main Form Container -->
-<div class="w-full max-w-[420px] bg-surface-container-lowest rounded-[2rem] shadow-[0_15px_30px_rgba(25,28,29,0.05)] ghost-border overflow-hidden p-4 md:p-6 mb-4 transition-all duration-300">
+<div class="w-full max-w-[420px] bg-surface-container-lowest rounded-2xl md:rounded-[2rem] shadow-[0_15px_30px_rgba(25,28,29,0.05)] ghost-border overflow-hidden p-2 md:p-6 mb-1 md:mb-4 transition-all duration-300">
 <!-- Tab Switcher -->
-<div class="flex p-1 bg-surface-container-high rounded-[1.2rem] mb-4">
+<div class="flex p-1 bg-surface-container-high rounded-[1.2rem] mb-2 md:mb-4">
 <button class="flex-1 py-2 px-1 rounded-[1rem] text-xs font-bold transition-all bg-surface-container-lowest text-primary shadow-sm" id="tabRegister" onclick="switchTab('register')">
                     Registro Rápido
                 </button>
@@ -150,12 +150,12 @@
 <!-- Forms Container -->
 <div class="px-1 md:px-2">
 <!-- Fast Punch Form -->
-<form class="space-y-4 block" id="fastForm">
-<div class="space-y-3">
+<form class="space-y-2 md:space-y-4 block" id="fastForm">
+<div class="space-y-2 md:space-y-3">
 <div class="space-y-1">
 <label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Tipo de Registro</label>
 <div class="relative">
-<select class="w-full bg-surface-container-high border-none rounded-[1rem] h-11 px-4 appearance-none focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" id="fastType" required="">
+<select class="w-full bg-surface-container-high border-none rounded-[1rem] h-10 md:h-11 px-4 appearance-none focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" id="fastType" required="">
 <option disabled="" selected="" value="">-- Selecione --</option>
 <option value="Entrada">Entrada</option>
 <option value="Saída Almoço">Saída para Almoço</option>
@@ -172,60 +172,62 @@
 <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-lg">expand_more</span>
 </div>
 </div>
-<div id="fastDateRange" class="hidden space-y-3">
+<div id="fastDateRange" class="hidden grid grid-cols-2 gap-2">
 <div class="space-y-1">
 <label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Data Inicial</label>
-<input type="date" id="fastStartDate" class="w-full bg-surface-container-high border-none rounded-[1rem] h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" />
+<input type="date" id="fastStartDate" class="w-full bg-surface-container-high border-none rounded-[1rem] h-10 md:h-11 px-2 md:px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" />
 </div>
 <div class="space-y-1">
 <label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Data Final</label>
-<input type="date" id="fastEndDate" class="w-full bg-surface-container-high border-none rounded-[1rem] h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" />
+<input type="date" id="fastEndDate" class="w-full bg-surface-container-high border-none rounded-[1rem] h-10 md:h-11 px-2 md:px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" />
 </div>
 </div>
+<div class="grid grid-cols-2 gap-2">
 <div class="space-y-1">
 <label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Matrícula</label>
-<input class="w-full bg-surface-container-high border-none rounded-[1rem] h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" id="fastMatricula" placeholder="Ex: 1234567-8" required="" type="text"/>
+<input class="w-full bg-surface-container-high border-none rounded-[1rem] h-10 md:h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" id="fastMatricula" placeholder="1234567-8" required="" type="text"/>
 </div>
 <div class="space-y-1">
-<label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Senha de Acesso</label>
+<label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Senha</label>
 <div class="relative">
-<input class="w-full bg-surface-container-high border-none rounded-[1rem] h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" id="fastPassword" placeholder="••••••••" required="" type="password"/>
+<input class="w-full bg-surface-container-high border-none rounded-[1rem] h-10 md:h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" id="fastPassword" placeholder="••••••••" required="" type="password"/>
 <button class="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant" onclick="const p = document.getElementById('fastPassword'); p.type = p.type === 'password' ? 'text' : 'password'" type="button">
-<span class="material-symbols-outlined text-lg">visibility</span>
+<span class="material-symbols-outlined text-[16px] md:text-lg">visibility</span>
 </button>
 </div>
 </div>
+</div>
 <!-- Novas Opções: Data e Observação -->
-<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+<div class="grid grid-cols-2 gap-2">
 <div class="space-y-1">
-<label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Data do Registro</label>
-<input type="date" id="fastRecordDate" class="w-full bg-surface-container-high border-none rounded-[1rem] h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" />
+<label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Data</label>
+<input type="date" id="fastRecordDate" class="w-full bg-surface-container-high border-none rounded-[1rem] h-10 md:h-11 px-2 md:px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" />
 </div>
 <div class="space-y-1">
-<label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Observação (e-Docs)</label>
-<textarea id="fastObservation" placeholder="Ex: Esqueci de bater..." class="w-full bg-surface-container-high border-none rounded-[1rem] py-2 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs h-11 resize-none"></textarea>
+<label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Observação</label>
+<textarea id="fastObservation" placeholder="Motivo..." class="w-full bg-surface-container-high border-none rounded-[1rem] py-2 px-2 md:px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs h-10 md:h-11 resize-none"></textarea>
 </div>
 </div>
 </div>
-<button class="w-full custom-gradient text-on-primary h-12 rounded-[1rem] font-bold text-sm shadow hover:scale-[1.01] active:scale-[0.99] transition-transform flex items-center justify-center gap-2 mt-2" id="fastBtn" type="submit">
+<button class="w-full custom-gradient text-on-primary h-11 md:h-12 rounded-[1rem] font-bold text-sm shadow hover:scale-[1.01] active:scale-[0.99] transition-transform flex items-center justify-center gap-2 mt-1 md:mt-2" id="fastBtn" type="submit">
 <span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">fingerprint</span>
 <span id="fastBtnText">REGISTRAR PONTO</span>
 </button>
 <div id="messageFast" class="mt-2 text-red-500 text-center font-bold text-[10px]"></div>
 </form>
 <!-- Server Login Form (Hidden by default) -->
-<form class="space-y-4 hidden" id="loginForm">
+<form class="space-y-2 md:space-y-4 hidden" id="loginForm">
 <div class="space-y-3">
 <div class="space-y-1">
 <label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Matrícula</label>
-<input class="w-full bg-surface-container-high border-none rounded-[1rem] h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" id="matricula" placeholder="Sua matrícula" required="" type="text"/>
+<input class="w-full bg-surface-container-high border-none rounded-[1rem] h-10 md:h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" id="matricula" placeholder="Sua matrícula" required="" type="text"/>
 </div>
 <div class="space-y-1">
 <label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Senha</label>
-<input class="w-full bg-surface-container-high border-none rounded-[1rem] h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" id="password" placeholder="••••••••" required="" type="password"/>
+<input class="w-full bg-surface-container-high border-none rounded-[1rem] h-10 md:h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" id="password" placeholder="••••••••" required="" type="password"/>
 </div>
 </div>
-<button class="w-full bg-primary text-on-primary h-12 rounded-[1rem] font-bold text-sm shadow hover:scale-[1.01] active:scale-[0.99] transition-transform flex items-center justify-center gap-2 mt-2" id="loginBtn" type="submit">
+<button class="w-full bg-primary text-on-primary h-11 md:h-12 rounded-[1rem] font-bold text-sm shadow hover:scale-[1.01] active:scale-[0.99] transition-transform flex items-center justify-center gap-2 mt-1 md:mt-2" id="loginBtn" type="submit">
 <span class="material-symbols-outlined text-lg">login</span>
                         <span id="loginBtnText">ENTRAR NO SISTEMA</span>
                     </button>
@@ -234,12 +236,12 @@
 </div>
 <div id="message" class="mt-2 text-red-500 text-center font-bold text-[10px]"></div>
 </form>
-<div class="text-center mt-3" id="forgotPass">
+<div class="text-center mt-2 md:mt-3" id="forgotPass">
 <a class="text-primary font-bold text-[10px] hover:underline" href="#">Esqueci minha senha</a>
 </div>
 </div>
 </div>
-<footer class="mt-8 pb-8 text-center text-on-surface-variant font-bold tracking-[0.2em] uppercase text-[9px] opacity-80">
+<footer class="mt-4 md:mt-8 pb-4 md:pb-8 text-center text-on-surface-variant font-bold tracking-[0.2em] uppercase text-[9px] opacity-80">
             SRE CARAPINA / GTI
         </footer>
 </main>
