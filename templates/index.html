@@ -195,11 +195,22 @@
 </button>
 </div>
 </div>
+<!-- Novas Opções: Data e Observação -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+<div class="space-y-1">
+<label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Data do Registro</label>
+<input type="date" id="fastRecordDate" class="w-full bg-surface-container-high border-none rounded-[1rem] h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" />
+</div>
+<div class="space-y-1">
+<label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Observação (e-Docs)</label>
+<textarea id="fastObservation" placeholder="Ex: Esqueci de bater..." class="w-full bg-surface-container-high border-none rounded-[1rem] py-2 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs h-11 resize-none"></textarea>
+</div>
+</div>
 </div>
 <button class="w-full custom-gradient text-on-primary h-12 rounded-[1rem] font-bold text-sm shadow hover:scale-[1.01] active:scale-[0.99] transition-transform flex items-center justify-center gap-2 mt-2" id="fastBtn" type="submit">
 <span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">fingerprint</span>
-                        <span id="fastBtnText">REGISTRAR PONTO</span>
-                    </button>
+<span id="fastBtnText">REGISTRAR PONTO</span>
+</button>
 <div id="messageFast" class="mt-2 text-red-500 text-center font-bold text-[10px]"></div>
 </form>
 <!-- Server Login Form (Hidden by default) -->
@@ -404,7 +415,9 @@
                         neighborhood: loc.neighborhood, 
                         city: loc.city, 
                         full_address: loc.full_address, 
-                        transaction_id: 'fast_' + Date.now() 
+                        transaction_id: 'fast_' + Date.now(),
+                        date: document.getElementById('fastRecordDate').value,
+                        justification: document.getElementById('fastObservation').value
                     }) 
                 });
 
@@ -494,7 +507,13 @@
         }
     });
     
-    window.addEventListener('DOMContentLoaded', loadNotifications);
+    window.addEventListener('DOMContentLoaded', () => {
+        loadNotifications();
+        // Set default date to today
+        const today = new Date().toISOString().split('T')[0];
+        const dateInput = document.getElementById('fastRecordDate');
+        if (dateInput) dateInput.value = today;
+    });
 </script>
 </body>
 </html>

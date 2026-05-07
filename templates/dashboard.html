@@ -197,6 +197,15 @@
 </div>
 </div>
 
+<!-- Campo de Observação Customizada -->
+<div class="w-full mb-6 bg-white p-4 rounded-xl border border-outline-variant/10 shadow-sm">
+    <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1 flex items-center gap-2 mb-2">
+        <span class="material-symbols-outlined text-sm">edit_note</span>
+        Observação para o e-Docs (opcional)
+    </label>
+    <textarea id="dashboardObservation" placeholder="Digite aqui se precisar justificar algo ou adicionar uma nota para o e-Docs..." class="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm h-16 resize-none shadow-inner"></textarea>
+</div>
+
 <!-- Action Grid -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
 <button onclick="registerPunch('Entrada')" class="btn-punch bg-gradient-to-br from-primary to-primary-container text-white p-6 md:p-8 rounded-xl flex flex-col items-center justify-center gap-4 shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:-translate-y-1 transition-all active:scale-95 group min-h-[140px] md:min-h-[180px]">
@@ -786,7 +795,8 @@
                 longitude: currentLocation.longitude,
                 accuracy: currentLocation.accuracy,
                 full_address: currentLocation.full_address,
-                transaction_id: transaction_id
+                transaction_id: transaction_id,
+                justification: document.getElementById('dashboardObservation').value
             };
 
             try {
@@ -798,6 +808,8 @@
                     body: JSON.stringify(punchData)
                 });
                 if (response.ok) {
+                    const obsField = document.getElementById('dashboardObservation');
+                    if (obsField) obsField.value = '';
                     alert("Ponto registrado com sucesso!");
                     loadHistory();
                     initGeolocation(true);
@@ -1131,6 +1143,11 @@
                 }
                 if (r.transaction_id && ['Férias', 'Abono', 'Abono (Dia Todo)', 'Atestado', 'Atestado (Dia Todo)', 'Compensação', 'Uso de Saldo', 'TRE'].includes(r.type)) {
                     suffix += ` <button onclick="cancelRecord('${r.transaction_id}', this)" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-error/10 text-error hover:bg-error hover:text-white ml-2 transition-colors border border-error/20" title="Cancelar este registro">❌ Cancelar</button>`;
+                }
+                
+                // v7.6: Badge para observação customizada
+                if (r.justification && r.justification !== "Lançado via Registro Rápido") {
+                    suffix += ` <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 ml-2" title="${r.justification}">📝 Obs</span>`;
                 }
                 
                 const isCanceled = (r.type || "").toLowerCase().includes('cancelado');
@@ -1557,6 +1574,11 @@
                             hasFerias = true;
                         } else if (t.includes('compensação') || t.includes('compensacao') || t.includes('saldo')) {
                             mObs.push("COMPENSAÇÃO / USO DE SALDO");
+                        }
+                        
+                        // v7.5: Adiciona justificativa customizada se houver
+                        if (r.justification && r.justification !== "Lançado via Registro Rápido" && !mObs.includes(r.justification.toUpperCase())) {
+                            mObs.push(r.justification.toUpperCase());
                         }
                     }
                 });

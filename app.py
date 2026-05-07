@@ -657,6 +657,26 @@ def punch(curr_user_mat, role):
     
     # fetch denormalized user fields if available
     user_matricula = curr_user_mat
+    
+    # --- Custom Date and Justification Logic ---
+    custom_date = data.get('date')
+    user_justification = data.get('justification')
+    
+    if custom_date:
+        try:
+            d = datetime.datetime.strptime(custom_date, '%Y-%m-%d')
+            # Combine custom date with current time
+            current_time = current_time.replace(year=d.year, month=d.month, day=d.day)
+            
+            # If the date is not today, it must be retroactive
+            today_now = datetime.datetime.now(pytz.timezone('America/Sao_Paulo')).date()
+            if d.date() != today_now:
+                # We'll set a flag that will be used later
+                pass 
+        except Exception as e:
+            print(f"DEBUG: Error parsing custom date {custom_date}: {e}")
+    # --------------------------------------------
+
     sql_user_id, user_name = get_user_info_by_matricula(user_matricula, conn) # Use 'conn' for potential SQL Server
     
     # Also find local user_id to catch orphaned local records
@@ -800,8 +820,20 @@ def punch(curr_user_mat, role):
              if r: user_cargo = r[0] or 'Funcionario'
     except: pass
     
-    is_retro_flag = 1 if any(word in data['type'].lower() for word in ['atestado', 'abono', 'férias', 'ferias', 'compensação', 'compensacao', 'justificativa', 'uso de saldo', 'tre']) else 0
-    justification_val = "Lançado via Registro Rápido" if is_retro_flag else None
+    is_retro_flag = 0
+    today_now = datetime.datetime.now(pytz.timezone('America/Sao_Paulo')).date()
+    if current_time.date() != today_now:
+        is_retro_flag = 1
+    
+    if any(word in data['type'].lower() for word in ['atestado', 'abono', 'férias', 'ferias', 'compensação', 'compensacao', 'justificativa', 'uso de saldo', 'tre']):
+        is_retro_flag = 1
+        
+    if user_justification and user_justification.strip():
+        # Somente forçamos retroativo se a DATA for diferente de hoje.
+        # Se for apenas uma observação no ponto de hoje, deixamos como ponto normal.
+        justification_val = user_justification
+    else:
+        justification_val = "Lançado via Registro Rápido" if is_retro_flag else None
 
     # If using SQL Server OR if we are in local VS Code mode (USE_SQLITE is true)
     # the receipt of a /api/punch request means we should save to TimeRecords immediately.
