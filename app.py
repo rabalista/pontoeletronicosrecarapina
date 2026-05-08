@@ -1759,11 +1759,21 @@ def delete_record(curr_user_mat, role, transaction_id):
     ph = get_ph(conn)
     try:
         cursor = conn.cursor()
-        cursor.execute(f"SELECT matricula FROM TimeRecords WHERE transaction_id = {ph}", (transaction_id,))
+        # Fetch info for special type check and cache clear signal
+        cursor.execute(f"SELECT matricula, record_type FROM TimeRecords WHERE transaction_id = {ph}", (transaction_id,))
         row = cursor.fetchone()
         target_matricula = rf(row, 'matricula') if row else None
+        rtype = rf(row, 'record_type') if row else None
         
-        cursor.execute(f"DELETE FROM TimeRecords WHERE transaction_id = {ph}", (transaction_id,))
+        # Determine if it's a special type that should be cancelled instead of deleted
+        special_types = ['Férias', 'Abono', 'Abono (Dia Todo)', 'Atestado', 'Atestado (Dia Todo)', 'Compensação', 'Uso de Saldo', 'TRE', 'férias', 'ferias']
+        is_special = any(t.lower() in (rtype or "").lower() for t in special_types) if rtype else False
+
+        if is_special:
+            new_type = f"Cancelado pelo Admin - {rtype}"
+            cursor.execute(f"UPDATE TimeRecords SET record_type = {ph}, justification = NULL, document_path = NULL WHERE transaction_id = {ph}", (new_type, transaction_id))
+        else:
+            cursor.execute(f"DELETE FROM TimeRecords WHERE transaction_id = {ph}", (transaction_id,))
         
         if target_matricula:
             try: cursor.execute(f"UPDATE Users SET must_clear_cache = 1 WHERE matricula = {ph}", (target_matricula,))
@@ -1775,14 +1785,19 @@ def delete_record(curr_user_mat, role, transaction_id):
         # Also mirror to local sqlite if online
         try:
             sconn = sqlite3.connect(sqlite_path)
-            sconn.execute("DELETE FROM TimeRecords WHERE transaction_id = ?", (transaction_id,))
+            if is_special:
+                sconn.execute("UPDATE TimeRecords SET record_type = ?, justification = NULL, document_path = NULL WHERE transaction_id = ?", (f"Cancelado pelo Admin - {rtype}", transaction_id))
+            else:
+                sconn.execute("DELETE FROM TimeRecords WHERE transaction_id = ?", (transaction_id,))
+            
             if target_matricula:
                 sconn.execute("UPDATE Users SET must_clear_cache = 1 WHERE matricula = ?", (target_matricula,))
             sconn.commit()
             sconn.close()
         except: pass
         
-        return jsonify({'message': 'Registro excluído com sucesso!'})
+        msg = 'Registro cancelado com sucesso!' if is_special else 'Registro excluído com sucesso!'
+        return jsonify({'message': msg})
     except Exception as e:
         return jsonify({'message': str(e)}), 500
     finally:

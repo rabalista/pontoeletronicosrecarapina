@@ -1586,12 +1586,13 @@
                         // Include custom observation for eDocs if present
                         if (r.justification && r.justification !== "Lançado via Registro Rápido") {
                             let displayObs = "";
-                            if (r.is_retroactive) {
-                                if (r.justification.includes(" ||| ")) {
-                                    displayObs = r.justification.split(" ||| ")[1].trim();
-                                }
+                            if (r.justification.includes(" ||| ")) {
+                                displayObs = r.justification.split(" ||| ")[1].trim();
                             } else {
-                                displayObs = r.justification.trim();
+                                // If no separator, use as is ONLY if it's not a standard system string
+                                if (r.justification !== "Lançado via Registro Rápido" && r.justification !== "Registro Rápido") {
+                                    displayObs = r.justification.trim();
+                                }
                             }
                             
                             if (displayObs && !mObs.includes(displayObs.toUpperCase())) {
