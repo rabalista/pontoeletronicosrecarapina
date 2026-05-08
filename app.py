@@ -224,7 +224,8 @@ def ensure_sqlite_schema(conn):
             name TEXT NOT NULL,
             cargo TEXT DEFAULT 'Funcionario',
             role TEXT DEFAULT 'user',
-            must_clear_cache INTEGER DEFAULT 0
+            must_clear_cache INTEGER DEFAULT 0,
+            must_change_password INTEGER DEFAULT 0
         )
     """)
     # Migration for existing SQLite Users table
@@ -233,6 +234,8 @@ def ensure_sqlite_schema(conn):
     try: c.execute("ALTER TABLE Users ADD COLUMN cargo TEXT DEFAULT 'Funcionario'")
     except: pass
     try: c.execute("ALTER TABLE Users ADD COLUMN workload TEXT DEFAULT '40h'")
+    except: pass
+    try: c.execute("ALTER TABLE Users ADD COLUMN must_change_password INTEGER DEFAULT 0")
     except: pass
     c.execute("""
         CREATE TABLE IF NOT EXISTS TimeRecords (
@@ -573,9 +576,9 @@ def login():
     try:
         cursor = conn.cursor()
         if not is_sqlite:
-            query = f"SELECT id, matricula, password, name, role, cargo FROM Users WITH (NOLOCK) WHERE matricula = {ph}"
+            query = f"SELECT id, matricula, password, name, role, cargo, must_change_password FROM Users WITH (NOLOCK) WHERE matricula = {ph}"
         else:
-            query = f"SELECT id, matricula, password, name, role, cargo FROM Users WHERE matricula = {ph}"
+            query = f"SELECT id, matricula, password, name, role, cargo, must_change_password FROM Users WHERE matricula = {ph}"
         cursor.execute(query, (data['matricula'],))
         user = cursor.fetchone()
     except Exception:
@@ -594,7 +597,7 @@ def login():
             ensure_sqlite_schema(sconn)
             scur = sconn.cursor()
             scur = sconn.cursor()
-            scur.execute("SELECT id, matricula, password, name, role, cargo FROM Users WHERE matricula = ?", (data['matricula'],))
+            scur.execute("SELECT id, matricula, password, name, role, cargo, must_change_password FROM Users WHERE matricula = ?", (data['matricula'],))
             user = scur.fetchone()
             sconn.close()
         except Exception:
@@ -612,12 +615,14 @@ def login():
             
             scur.execute("SELECT 1 FROM Users WHERE matricula = ?", (data['matricula'],))
             exists = scur.fetchone()
+            must_change = rf(user, 'must_change_password')
+            if must_change is None: must_change = 0
             if exists:
-                 scur.execute("UPDATE Users SET password = ?, name = ?, role = ?, cargo = ? WHERE matricula = ?", 
-                              (current_hash, rf(user, 'name'), rf(user, 'role'), rf(user, 'cargo'), data['matricula']))
+                 scur.execute("UPDATE Users SET password = ?, name = ?, role = ?, cargo = ?, must_change_password = ? WHERE matricula = ?", 
+                              (current_hash, rf(user, 'name'), rf(user, 'role'), rf(user, 'cargo'), must_change, data['matricula']))
             else:
-                scur.execute("INSERT INTO Users (matricula, password, name, role, cargo) VALUES (?, ?, ?, ?, ?)",
-                             (data['matricula'], current_hash, rf(user, 'name'), rf(user, 'role'), rf(user, 'cargo')))
+                scur.execute("INSERT INTO Users (matricula, password, name, role, cargo, must_change_password) VALUES (?, ?, ?, ?, ?, ?)",
+                             (data['matricula'], current_hash, rf(user, 'name'), rf(user, 'role'), rf(user, 'cargo'), must_change))
             sconn.commit()
             sconn.close()
         except Exception:
@@ -634,7 +639,9 @@ def login():
             # Trigger background sync for this user immediately
             threading.Thread(target=perform_sync_for_user, args=(rf(user, 'matricula'),), daemon=True).start()
             
-            return jsonify({'token': token, 'role': rf(user, 'role'), 'name': rf(user, 'name'), 'cargo': rf(user, 'cargo')})
+            mc = rf(user, 'must_change_password')
+            must_change = True if mc in (1, '1', True) else False
+            return jsonify({'token': token, 'role': rf(user, 'role'), 'name': rf(user, 'name'), 'cargo': rf(user, 'cargo'), 'must_change_password': must_change})
         except Exception as e:
             return jsonify({'message': f'Internal Server Error: {str(e)}'}), 500
     
@@ -1300,6 +1307,9 @@ def get_users(curr_user_mat, role):
                 cursor.execute("""
                 IF COL_LENGTH('Users', 'workload') IS NULL BEGIN ALTER TABLE Users ADD workload NVARCHAR(50) DEFAULT '40h' END
                 """)
+                cursor.execute("""
+                IF COL_LENGTH('Users', 'must_change_password') IS NULL BEGIN ALTER TABLE Users ADD must_change_password INT DEFAULT 0 END
+                """)
                 conn.commit()
             except: pass
         
@@ -1473,6 +1483,78 @@ def update_user(curr_user_mat, role, user_id):
         if 'UNIQUE' in msg or 'duplicate' in msg:
             return jsonify({'message': 'Matrícula já existe'}), 409
         return jsonify({'message': msg}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
+@app.route('/api/admin/users/<int:user_id>/reset-password', methods=['POST'])
+@token_required
+def reset_user_password(curr_user_mat, role, user_id):
+    if role != 'admin':
+        return jsonify({'message': 'Unauthorized'}), 401
+    
+    conn = get_db_connection()
+    ph = get_ph(conn)
+    hashed_password = bcrypt.hashpw('123456'.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    try:
+        cursor = conn.cursor()
+        
+        is_sqlite = isinstance(conn, sqlite3.Connection)
+        nolock = "" if is_sqlite else "WITH (NOLOCK)"
+        cursor.execute(f"SELECT matricula FROM Users {nolock} WHERE id = {ph}", (user_id,))
+        user = cursor.fetchone()
+        if not user:
+            return jsonify({'message': 'User not found'}), 404
+        mat = rf(user, 'matricula')
+
+        cursor.execute(f"UPDATE Users SET password = {ph}, must_change_password = 1 WHERE id = {ph}", (hashed_password, user_id))
+        try: conn.commit()
+        except: pass
+        
+        try:
+            sconn = sqlite3.connect(sqlite_path)
+            scur = sconn.cursor()
+            scur.execute("UPDATE Users SET password = ?, must_change_password = 1 WHERE matricula = ?", (hashed_password, mat))
+            sconn.commit()
+            sconn.close()
+        except: pass
+
+        return jsonify({'message': 'Senha resetada para 123456 com sucesso!'})
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
+@app.route('/api/user/change-password', methods=['POST'])
+@token_required
+def change_password(curr_user_mat, role):
+    data = request.get_json()
+    new_password = data.get('new_password')
+    if not new_password:
+        return jsonify({'message': 'Nova senha é obrigatória'}), 400
+        
+    hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    
+    conn = get_db_connection()
+    ph = get_ph(conn)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(f"UPDATE Users SET password = {ph}, must_change_password = 0 WHERE matricula = {ph}", (hashed_password, curr_user_mat))
+        try: conn.commit()
+        except: pass
+        
+        try:
+            sconn = sqlite3.connect(sqlite_path)
+            scur = sconn.cursor()
+            scur.execute("UPDATE Users SET password = ?, must_change_password = 0 WHERE matricula = ?", (hashed_password, curr_user_mat))
+            sconn.commit()
+            sconn.close()
+        except: pass
+
+        return jsonify({'message': 'Senha alterada com sucesso!'})
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
     finally:
         try: conn.close()
         except: pass

@@ -244,6 +244,30 @@
 </main>
 </div>
 
+<!-- FORCE PASSWORD CHANGE MODAL -->
+<div id="forcePasswordModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-surface-container-lowest w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden p-6">
+        <div class="flex flex-col items-center mb-6">
+            <span class="material-symbols-outlined text-error text-5xl mb-2">lock_reset</span>
+            <h2 class="text-xl font-bold text-center text-on-surface">Troca de Senha Obrigatória</h2>
+            <p class="text-xs text-on-surface-variant text-center mt-2">Sua senha foi redefinida pelo administrador. Por favor, crie uma nova senha agora para continuar.</p>
+        </div>
+        <form id="forcePasswordForm" class="space-y-4">
+            <div class="space-y-1">
+                <label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Nova Senha</label>
+                <input type="password" id="newForcePassword" required class="w-full bg-surface-container-high border-none rounded-[1rem] h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" placeholder="Digite sua nova senha">
+            </div>
+            <div class="space-y-1">
+                <label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Confirmar Nova Senha</label>
+                <input type="password" id="confirmForcePassword" required class="w-full bg-surface-container-high border-none rounded-[1rem] h-11 px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs" placeholder="Confirme a senha">
+            </div>
+            <button type="submit" id="forcePasswordBtn" class="w-full bg-error text-white h-11 rounded-[1rem] font-bold text-sm shadow hover:scale-[1.02] active:scale-[0.98] transition-transform">
+                SALVAR NOVA SENHA
+            </button>
+        </form>
+    </div>
+</div>
+
 <!-- RADAR SCREEN (Hidden) -->
 <div id="radarScreen" class="text-center hidden fixed top-0 left-0 w-full h-full bg-white/95 z-50 flex-col justify-center items-center">
     <div class="bg-primary/10 p-10 rounded-full mb-6">
@@ -271,10 +295,67 @@
         b.disabled = true; t.innerText = 'ENTRANDO...'; ri.innerText = 'sync'; ri.classList.add('animate-spin'); document.getElementById('message').innerText = "";
         try {
             const r = await apiFetch(`/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ matricula: m, password: p }) });
-            if (r && r.ok) { const d = await r.json(); localStorage.setItem('ponto_token', d.token); localStorage.setItem('user_role', d.role); localStorage.setItem('user_name', d.name); localStorage.setItem('user_matricula', m); localStorage.setItem('user_cargo', d.cargo || 'Funcionario'); window.location.href = d.role === 'admin' ? 'admin.html' : 'dashboard.html'; }
+            if (r && r.ok) { 
+                const d = await r.json(); 
+                localStorage.setItem('ponto_token', d.token); 
+                localStorage.setItem('user_role', d.role); 
+                localStorage.setItem('user_name', d.name); 
+                localStorage.setItem('user_matricula', m); 
+                localStorage.setItem('user_cargo', d.cargo || 'Funcionario'); 
+                
+                if (d.must_change_password) {
+                    window.pendingRoleForRedirect = d.role;
+                    document.getElementById('forcePasswordModal').classList.remove('hidden');
+                } else {
+                    window.location.href = d.role === 'admin' ? 'admin.html' : 'dashboard.html'; 
+                }
+            }
             else { document.getElementById('message').innerText = 'Erro na autenticação'; b.disabled = false; t.innerText = 'ENTRAR NO SISTEMA'; ri.innerText = 'login'; ri.classList.remove('animate-spin'); }
         } catch { document.getElementById('loginScreen').classList.add('hidden'); document.getElementById('radarScreen').style.display='flex'; if (window.startRadarMode) window.startRadarMode((s) => { document.getElementById('radarStatus').innerHTML = s; }); }
     });
+
+    document.getElementById('forcePasswordForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const p1 = document.getElementById('newForcePassword').value;
+        const p2 = document.getElementById('confirmForcePassword').value;
+        if (p1 !== p2) {
+            alert('As senhas não coincidem!');
+            return;
+        }
+        if (p1.length < 3) {
+            alert('A senha deve ter pelo menos 3 caracteres.');
+            return;
+        }
+
+        const btn = document.getElementById('forcePasswordBtn');
+        btn.disabled = true;
+        btn.innerText = 'SALVANDO...';
+        
+        try {
+            const token = localStorage.getItem('ponto_token');
+            const res = await apiFetch('/api/user/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ new_password: p1 })
+            });
+
+            if (res.ok) {
+                alert('Senha alterada com sucesso! Bem-vindo(a).');
+                document.getElementById('forcePasswordModal').classList.add('hidden');
+                window.location.href = window.pendingRoleForRedirect === 'admin' ? 'admin.html' : 'dashboard.html';
+            } else {
+                const err = await res.json();
+                alert(err.message || 'Erro ao alterar a senha.');
+                btn.disabled = false;
+                btn.innerText = 'SALVAR NOVA SENHA';
+            }
+        } catch (err) {
+            alert('Erro de conexão ao tentar alterar a senha.');
+            btn.disabled = false;
+            btn.innerText = 'SALVAR NOVA SENHA';
+        }
+    });
+
     setInterval(() => {
         const n = new Date(); document.getElementById('fastClock').innerText = n.toLocaleTimeString('pt-BR');
         const o = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }; let ds = n.toLocaleDateString('pt-BR', o);
