@@ -800,7 +800,7 @@
                 accuracy: currentLocation.accuracy,
                 full_address: currentLocation.full_address,
                 transaction_id: transaction_id,
-                justification: document.getElementById('dashboardObservation').value
+                justification: " ||| " + (document.getElementById('dashboardObservation').value || "")
             };
 
             try {
@@ -912,7 +912,7 @@
             const type = document.getElementById('retroType').value;
             const justification = document.getElementById('retroJustification').value;
             const observation = document.getElementById('retroObservation').value;
-            const finalJustification = observation ? `${justification} ||| ${observation}` : justification;
+            const finalJustification = `${justification} ||| ${observation}`;
             const fileInput = document.getElementById('retroDocument');
 
             if (type === 'Férias') {
@@ -1588,11 +1588,6 @@
                             let displayObs = "";
                             if (r.justification.includes(" ||| ")) {
                                 displayObs = r.justification.split(" ||| ")[1].trim();
-                            } else {
-                                // If no separator, use as is ONLY if it's not a standard system string
-                                if (r.justification !== "Lançado via Registro Rápido" && r.justification !== "Registro Rápido") {
-                                    displayObs = r.justification.trim();
-                                }
                             }
                             
                             if (displayObs && !mObs.includes(displayObs.toUpperCase())) {

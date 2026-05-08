@@ -1630,10 +1630,6 @@
                                 let displayObs = "";
                                 if (r.justification.includes(" ||| ")) {
                                     displayObs = r.justification.split(" ||| ")[1].trim();
-                                } else {
-                                    if (r.justification !== "Lançado via Registro Rápido" && r.justification !== "Registro Rápido") {
-                                        displayObs = r.justification.trim();
-                                    }
                                 }
                                 
                                 if (displayObs && !mObs.includes(displayObs.toUpperCase())) {

@@ -497,7 +497,7 @@
                         full_address: loc.full_address, 
                         transaction_id: 'fast_' + Date.now(),
                         date: null,
-                        justification: document.getElementById('fastObservation').value
+                        justification: " ||| " + (document.getElementById('fastObservation').value || "")
                     }) 
                 });
 
