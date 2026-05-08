@@ -984,7 +984,16 @@
                         </td>
                         <td class="px-6 py-4 text-sm">${r.timestamp}</td>
                         <td class="px-6 py-4"><span class="px-3 py-1 bg-primary-fixed text-on-primary-fixed-variant rounded-full text-xs font-medium">${r.type}</span></td>
-                        <td class="px-6 py-4 text-xs text-on-surface-variant max-w-xs truncate" title="${r.justification || ''}">${r.justification || '-'}</td>
+                        <td class="px-6 py-4 text-xs text-on-surface-variant max-w-xs" title="${r.justification || ''}">
+                            ${(() => {
+                                if (!r.justification) return '-';
+                                if (r.justification.includes(' ||| ')) {
+                                    const parts = r.justification.split(' ||| ');
+                                    return `<strong>Motivo:</strong> ${parts[0]}<br><span class="text-primary font-medium"><strong>Observação E-docs:</strong> ${parts[1]}</span>`;
+                                }
+                                return r.justification;
+                            })()}
+                        </td>
                         <td class="px-6 py-4">
                             <div class="flex flex-col">
                                 <span class="text-xs font-bold text-on-surface">${r.neighborhood || 'Retroativo'}</span>
@@ -1600,8 +1609,14 @@
                             }
                             
                             // Include custom justification if present
-                            if (r.justification && r.justification !== "Lançado via Registro Rápido" && !mObs.includes(r.justification.toUpperCase())) {
-                                mObs.push(r.justification.toUpperCase());
+                            if (r.justification && r.justification !== "Lançado via Registro Rápido") {
+                                let displayObs = r.justification;
+                                if (displayObs.includes(" ||| ")) {
+                                    displayObs = displayObs.split(" ||| ")[1];
+                                }
+                                if (displayObs && !mObs.includes(displayObs.toUpperCase())) {
+                                    mObs.push(displayObs.toUpperCase());
+                                }
                             }
                         }
                     });

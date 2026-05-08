@@ -347,6 +347,10 @@
                     <textarea id="retroJustification" rows="3" required placeholder="Exemplo: Esqueci de bater, falha de rede..." class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all resize-none"></textarea>
                 </div>
                 <div>
+                    <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">Observação E-docs: <span class="text-outline">(Opcional)</span></label>
+                    <textarea id="retroObservation" rows="2" placeholder="Observação que aparecerá no relatório eDocs..." class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all resize-none"></textarea>
+                </div>
+                <div>
                     <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">Anexo <span class="text-outline">(Opcional)</span></label>
                     <input type="file" id="retroDocument" accept="image/*,application/pdf" class="w-full text-sm text-on-surface-variant file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-fixed file:text-primary hover:file:bg-primary-fixed-dim transition-colors cursor-pointer">
                 </div>
@@ -907,6 +911,8 @@
             const dt = document.getElementById('retroDatetime').value;
             const type = document.getElementById('retroType').value;
             const justification = document.getElementById('retroJustification').value;
+            const observation = document.getElementById('retroObservation').value;
+            const finalJustification = observation ? `${justification} ||| ${observation}` : justification;
             const fileInput = document.getElementById('retroDocument');
 
             if (type === 'Férias') {
@@ -922,7 +928,7 @@
                 const fd = new FormData();
                 fd.append('type', 'Férias');
                 fd.append('datetime', dtStr);
-                fd.append('justification', `Férias do período ${sDateStr} a ${eDateStr} | ${justification}`);
+                fd.append('justification', `Férias do período ${sDateStr} a ${eDateStr} | ${finalJustification}`);
                 if (fileInput.files.length > 0) fd.append('document', fileInput.files[0]);
                 fd.append('latitude', currentLocation.latitude || '');
                 fd.append('longitude', currentLocation.longitude || '');
@@ -952,7 +958,7 @@
                 const formData = new FormData();
                 formData.append('datetime', dt);
                 formData.append('type', type);
-                formData.append('justification', justification);
+                formData.append('justification', finalJustification);
                 
                 if (fileInput.files.length > 0) {
                     formData.append('document', fileInput.files[0]);
@@ -1133,7 +1139,7 @@
                     if (r.is_reviewed) {
                         suffix += `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-variant text-on-surface-variant ml-2 bg-gray-200 text-gray-800" title="${r.justification}">Ajuste Manual</span>`;
                     } else {
-                        suffix += `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-warning-container text-on-warning-container ml-2 bg-yellow-100 text-yellow-800" title="Aguardando aprovação do administrador">Aguardando Aprovação</span>`;
+                        suffix += `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-warning-container text-on-surface-variant ml-2 bg-yellow-100 text-yellow-800" title="Aguardando aprovação do administrador">Aguardando Aprovação</span>`;
                     }
                 }
                 if (r.document_path) {
@@ -1577,9 +1583,15 @@
                             mObs.push("COMPENSAÇÃO / USO DE SALDO");
                         }
                         
-                        // v7.5: Adiciona justificativa customizada se houver
-                        if (r.justification && r.justification !== "Lançado via Registro Rápido" && !mObs.includes(r.justification.toUpperCase())) {
-                            mObs.push(r.justification.toUpperCase());
+                        // Include custom justification if present
+                        if (r.justification && r.justification !== "Lançado via Registro Rápido") {
+                            let displayObs = r.justification;
+                            if (displayObs.includes(" ||| ")) {
+                                displayObs = displayObs.split(" ||| ")[1];
+                            }
+                            if (displayObs && !mObs.includes(displayObs.toUpperCase())) {
+                                mObs.push(displayObs.toUpperCase());
+                            }
                         }
                     }
                 });
