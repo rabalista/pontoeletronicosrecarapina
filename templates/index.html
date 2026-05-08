@@ -199,7 +199,7 @@
 </div>
 <!-- Novas Opções: Data e Observação -->
 <div class="w-full">
-<input type="hidden" id="fastRecordDate" />
+
 <div class="space-y-1">
 <label class="text-[9px] font-bold text-on-surface-variant uppercase tracking-[0.1em] px-1">Observação E-Docs</label>
 <textarea id="fastObservation" placeholder="Motivo..." class="w-full bg-surface-container-high border-none rounded-[1rem] py-2 px-2 md:px-4 focus:bg-surface-container-lowest transition-all focus:outline-none rounded-input text-xs h-10 md:h-11 resize-none"></textarea>
@@ -415,7 +415,7 @@
                         city: loc.city, 
                         full_address: loc.full_address, 
                         transaction_id: 'fast_' + Date.now(),
-                        date: document.getElementById('fastRecordDate').value,
+                        date: null,
                         justification: document.getElementById('fastObservation').value
                     }) 
                 });
@@ -508,10 +508,7 @@
     
     window.addEventListener('DOMContentLoaded', () => {
         loadNotifications();
-        // Set default date to today
-        const today = new Date().toISOString().split('T')[0];
-        const dateInput = document.getElementById('fastRecordDate');
-        if (dateInput) dateInput.value = today;
+
     });
 </script>
 </body>
