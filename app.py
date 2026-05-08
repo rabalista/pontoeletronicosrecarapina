@@ -1139,7 +1139,8 @@ def history(curr_user_mat, role):
                         ts = ts.strftime('%Y-%m-%d %H:%M:%S')
                     tx_id = rf(row, 'transaction_id')
                     tx_id_str = str(tx_id) if tx_id else None
-                    key = str(ts).split('.')[0]
+                    record_type_str = str(rf(row, 'record_type') or '')
+                    key = f"{str(ts).split('.')[0]}_{record_type_str}"
                     if key not in seen and (not tx_id_str or tx_id_str not in seen):
                         seen.add(key)
                         if tx_id_str: seen.add(tx_id_str)
@@ -1181,7 +1182,8 @@ def history(curr_user_mat, role):
                     ts = ts.strftime('%Y-%m-%d %H:%M:%S')
                 tx_id = rf(row, 'transaction_id')
                 tx_id_str = str(tx_id) if tx_id else None
-                key = str(ts).split('.')[0]
+                record_type_str = str(rf(row, 'record_type') or '')
+                key = f"{str(ts).split('.')[0]}_{record_type_str}"
                 if key not in seen and (not tx_id_str or tx_id_str not in seen):
                     seen.add(key)
                     if tx_id_str: seen.add(tx_id_str)

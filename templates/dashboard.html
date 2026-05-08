@@ -1154,7 +1154,23 @@
                 
                 // v7.6: Badge para observação customizada
                 if (r.justification && r.justification !== "Lançado via Registro Rápido") {
-                    suffix += ` <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 ml-2" title="${r.justification}">📝 Obs</span>`;
+                    let displayObs = "";
+                    if (r.justification.includes(" ||| ")) {
+                        displayObs = r.justification.split(" ||| ")[1].trim();
+                    } else if (r.justification.includes(" / ")) {
+                        const parts = r.justification.split(" / ");
+                        if (parts.length >= 4 && parts[0].length <= 3 && parts[1].length <= 3) {
+                            displayObs = parts.slice(3).join(" / ").trim();
+                        } else {
+                            displayObs = r.justification.trim();
+                        }
+                    } else if (r.justification !== "Lançado via Registro Rápido" && r.justification !== "Registro Rápido") {
+                        displayObs = r.justification.trim();
+                    }
+                    
+                    if (displayObs) {
+                        suffix += ` <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 ml-2" title="${displayObs}">📝 Obs</span>`;
+                    }
                 }
                 
                 const isCanceled = (r.type || "").toLowerCase().includes('cancelado');
@@ -1588,6 +1604,15 @@
                             let displayObs = "";
                             if (r.justification.includes(" ||| ")) {
                                 displayObs = r.justification.split(" ||| ")[1].trim();
+                            } else if (r.justification.includes(" / ")) {
+                                const parts = r.justification.split(" / ");
+                                if (parts.length >= 4 && parts[0].length <= 3 && parts[1].length <= 3) {
+                                    displayObs = parts.slice(3).join(" / ").trim();
+                                } else {
+                                    displayObs = r.justification.trim();
+                                }
+                            } else if (r.justification !== "Lançado via Registro Rápido" && r.justification !== "Registro Rápido") {
+                                displayObs = r.justification.trim();
                             }
                             
                             if (displayObs && !mObs.includes(displayObs.toUpperCase())) {
