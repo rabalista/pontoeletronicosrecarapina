@@ -1559,21 +1559,15 @@
                         groupedByType[t].push(r);
                     });
                     
-                    const filteredPunchesList = [];
-                    for (const t in groupedByType) {
-                        const pts = groupedByType[t];
-                        const approvedRetros = pts.filter(p => p.is_retroactive && p.is_reviewed);
-                        if (approvedRetros.length > 0) {
-                            filteredPunchesList.push(approvedRetros[approvedRetros.length - 1]);
-                        } else {
-                            filteredPunchesList.push(...pts);
-                        }
-                    }
+                    const filteredPunchesList = [...stdPunches];
+
+
                     
                     const realPunches = filteredPunchesList.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 
                     const formatTime = (match) => {
-                        if (!match || (match.is_retroactive && !match.is_reviewed)) return "";
+                        if (!match) return "";
+
                         let time = match.timestamp.split(' ')[1].substring(0, 5);
                         return time;
                     };
@@ -1606,7 +1600,7 @@
                     let hasComp = false;
                     let hasTre = false;
                     dayRecords.forEach(r => {
-                        if (!r.is_retroactive || r.is_reviewed) {
+                    if (true) { // v6.9: Show all observations regardless of review status
                             let t = (r.type || "").toLowerCase();
                             if (t.includes('atestado')) {
                                 mObs.push("ATESTADO");

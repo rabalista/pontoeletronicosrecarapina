@@ -2437,22 +2437,8 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                         if has_atestado or has_abono or has_comp or has_ferias or has_tre:
                             pass 
                         
-                        final_punches = []
-                        grouped_by_type = {}
-                        for p in real_punches:
-                            t = p['type']
-                            if t not in grouped_by_type:
-                                grouped_by_type[t] = []
-                            grouped_by_type[t].append(p)
-                        
-                        for t, pts in grouped_by_type.items():
-                            valid_pts = [p for p in pts if not p.get('is_retroactive') or p.get('is_reviewed')]
-                            approved_retros = [p for p in valid_pts if p.get('is_retroactive')]
-                            if approved_retros:
-                                final_punches.append(approved_retros[-1])
-                            else:
-                                final_punches.extend(valid_pts)
-                        
+                        # Collect all valid punches directly
+                        final_punches = real_punches
                         final_punches.sort(key=lambda x: x['time'])
                         
                         standard_punches = [p for p in final_punches if '3º turno' not in (p['type'] or "").lower()]

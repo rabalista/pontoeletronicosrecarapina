@@ -1449,8 +1449,10 @@
 
                 const token = localStorage.getItem('ponto_token');
                 if (window.API_READY) await window.API_READY;
-                const url = `/api/history?start_date=${startStr}&end_date=${endStr}`;
+                // v6.9: Add timestamp to bypass potential server-side or proxy caching
+                const url = `/api/history?start_date=${startStr}&end_date=${endStr}&_=${Date.now()}`;
                 const response = await apiFetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+
 
                 if (response.ok) {
                     const data = await response.json();
@@ -1537,20 +1539,15 @@
                 });
                 
                 const filteredPunchesList = [];
-                for (const t in groupedByType) {
-                    const pts = groupedByType[t];
-                    const approvedRetros = pts.filter(p => p.is_retroactive && p.is_reviewed);
-                    if (approvedRetros.length > 0) {
-                        filteredPunchesList.push(approvedRetros[approvedRetros.length - 1]);
-                    } else {
-                        filteredPunchesList.push(...pts);
-                    }
-                }
+                filteredPunchesList.push(...stdPunches);
+
                 
                 const realPunches = filteredPunchesList.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 
                 const formatTime = (match) => {
-                    if (!match || (match.is_retroactive && !match.is_reviewed)) return "";
+                    if (!match) return "";
+                    // v6.9: Always show retroactive punches in reports once registered
+
                     let time = match.timestamp.split(' ')[1].substring(0, 5);
                     return time;
                 };
@@ -1581,7 +1578,8 @@
                 let hasFerias = false;
                 let hasTre = false;
                 dayRecords.forEach(r => {
-                    if (!r.is_retroactive || r.is_reviewed) {
+                    if (true) { // v6.9: Show all observations regardless of review status
+
                         let t = (r.type || "").toLowerCase();
                         if (t.includes('atestado')) {
                             mObs.push("ATESTADO");
