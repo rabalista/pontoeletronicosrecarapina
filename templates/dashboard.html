@@ -331,6 +331,10 @@
                             <option value="Saída Almoço">Saída Almoço</option>
                             <option value="Volta Almoço">Volta Almoço</option>
                             <option value="Saída">Saída</option>
+                            <option value="Entrada Externo/Diária">Entrada Externo/Diária</option>
+                            <option value="Saída Almoço Externo/Diária">Saída Almoço Externo/Diária</option>
+                            <option value="Volta Almoço Externo/Diária">Volta Almoço Externo/Diária</option>
+                            <option value="Saída Externo/Diária">Saída Externo/Diária</option>
                             <option value="3º Turno - Saída Extra">3º Turno - Saída Extra</option>
                             <option value="3º Turno - Entrada Extra">3º Turno - Entrada Extra</option>
                             <option value="Atestado (Dia Todo)">Atestado (Dia Todo)</option>
@@ -1595,6 +1599,10 @@
                             hasFerias = true;
                         } else if (t.includes('compensação') || t.includes('compensacao') || t.includes('saldo')) {
                             mObs.push("COMPENSAÇÃO / USO DE SALDO");
+                        } else if (t.includes('externo') || t.includes('diária') || t.includes('diaria')) {
+                            if (!mObs.includes("EXTERNO/DIÁRIA")) {
+                                mObs.push("EXTERNO/DIÁRIA");
+                            }
                         }
                         
                         // Include custom observation for eDocs if present

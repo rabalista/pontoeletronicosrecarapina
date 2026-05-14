@@ -2408,6 +2408,7 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                     has_ferias = False
                     has_comp = False
                     has_tre = False
+                    has_externo = False
                     ent_m, sai_m, ent_t, sai_t, ent_x, sai_x = None, None, None, None, None, None
                     
                     if len(punches) > 0:
@@ -2432,6 +2433,8 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                                 else:
                                     has_comp = True
                             else:
+                                if 'externo' in t_str or 'diária' in t_str or 'diaria' in t_str:
+                                    has_externo = True
                                 real_punches.append(p)
                         
                         if has_atestado or has_abono or has_comp or has_ferias or has_tre:
@@ -2484,6 +2487,9 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                     
                     daily_sec = daily_hours * 3600
                     deficit_sec = max(0, daily_sec - w_sec)
+
+                    if has_externo and not (has_atestado or has_abono or has_comp or has_ferias or has_tre):
+                        ws.cell(row=row_idx, column=16, value=0).number_format = '[h]:mm:ss'
 
                     if has_atestado or has_abono or has_comp or has_ferias or has_tre:
                         if has_atestado or has_abono or has_ferias or has_tre:

@@ -1617,6 +1617,10 @@
                             } else if (t.includes('compensação') || t.includes('compensacao') || t.includes('saldo')) {
                                 mObs.push("COMPENSAÇÃO / USO DE SALDO");
                                 hasComp = true;
+                            } else if (t.includes('externo') || t.includes('diária') || t.includes('diaria')) {
+                                if (!mObs.includes("EXTERNO/DIÁRIA")) {
+                                    mObs.push("EXTERNO/DIÁRIA");
+                                }
                             }
                             
                             // Include custom observation for eDocs if present
