@@ -97,9 +97,99 @@
         
         .btn-punch { cursor: pointer; }
         .btn-punch:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Futuristic Left Floating Button */
+        .futuristic-floating-btn {
+            position: fixed;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 1050;
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            border: 1px solid rgba(0, 240, 255, 0.25);
+            border-left: none;
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.15), inset 0 0 10px rgba(0, 240, 255, 0.05);
+            color: #fff;
+            padding: 20px 10px;
+            border-top-right-radius: 16px;
+            border-bottom-right-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            width: 48px;
+        }
+        .futuristic-floating-btn:hover {
+            background: linear-gradient(135deg, #1e293b, #334155);
+            box-shadow: 0 0 35px rgba(0, 240, 255, 0.3), inset 0 0 15px rgba(0, 240, 255, 0.15);
+            border-color: rgba(0, 240, 255, 0.5);
+            width: 54px;
+        }
+        .futuristic-floating-btn .btn-text {
+            writing-mode: vertical-lr;
+            transform: rotate(180deg);
+            font-size: 0.65rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #94a3b8;
+            transition: color 0.3s;
+        }
+        .futuristic-floating-btn:hover .btn-text {
+            color: #00f0ff;
+        }
+        .futuristic-floating-btn .material-symbols-outlined {
+            color: #00f0ff;
+            font-size: 20px;
+            animation: pulse-neon 2s infinite;
+        }
+        @keyframes pulse-neon {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(0, 240, 255, 0.4)); }
+            50% { transform: scale(1.1); filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.8)); }
+        }
+
+        /* Mobile Floating Button */
+        .futuristic-mobile-btn {
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+            z-index: 1050;
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 15px rgba(0, 240, 255, 0.2);
+            color: #fff;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .futuristic-mobile-btn:active {
+            transform: scale(0.9);
+        }
+        .futuristic-mobile-btn .material-symbols-outlined {
+            color: #00f0ff;
+            font-size: 24px;
+        }
 </style>
 </head>
 <body class="text-on-surface min-h-screen selection:bg-primary-fixed">
+
+    <!-- Floating Futuristic Button on the Left (Desktop) -->
+    <div class="futuristic-floating-btn d-none md:flex" onclick="openHoursSummary()">
+        <span class="material-symbols-outlined">monitoring</span>
+        <span class="btn-text">Resumo Horas</span>
+    </div>
+
+    <!-- Floating Futuristic Button (Mobile - Bottom Left) -->
+    <div class="futuristic-mobile-btn md:hidden" onclick="openHoursSummary()">
+        <span class="material-symbols-outlined">monitoring</span>
+    </div>
 
 <!-- Top Navigation Shell -->
 <header class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-xl border-b border-outline-variant/10">
@@ -131,6 +221,10 @@
 <span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
 <span class="font-medium">Dashboard</span>
 </a>
+<button onclick="openHoursSummary()" class="w-full flex items-center gap-4 py-3 px-6 text-slate-600 hover:text-[#3370B7] hover:bg-[#3370B7]/5 rounded-full transition-all duration-300 mt-4 group border border-dashed border-slate-300 hover:border-[#3370B7]/60 hover:shadow-[0_0_12px_rgba(51,112,183,0.15)] bg-slate-50/50 backdrop-blur-xs">
+    <span class="material-symbols-outlined text-teal-600 animate-pulse group-hover:rotate-12 transition-transform">schedule</span>
+    <span class="text-[11px] font-bold uppercase tracking-wider text-left leading-tight">Resumo Cálculo de horas</span>
+</button>
 </nav>
 <div class="mt-auto pt-6 border-t border-outline-variant/15">
 <div class="flex items-center gap-3 px-4">
@@ -289,6 +383,10 @@
 <span class="material-symbols-outlined" data-icon="home">home</span>
 <span class="text-[10px] font-bold uppercase tracking-widest mt-1">Início</span>
 </a>
+<button onclick="openHoursSummary()" class="flex flex-col items-center justify-center text-slate-600 rounded-[2rem] py-2 px-6 scale-90 hover:bg-black/5 active:bg-black/10 transition-all">
+<span class="material-symbols-outlined text-teal-600 animate-pulse">schedule</span>
+<span class="text-[10px] font-bold uppercase tracking-widest mt-1">Resumo Horas</span>
+</button>
 </nav>
 
 <!-- Footer -->
@@ -2048,7 +2146,238 @@
                 }
             }
         }
+
+        function openHoursSummary() {
+            const modal = document.getElementById('hoursSummaryModal');
+            const content = document.getElementById('hoursSummaryModalContent');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                content.classList.remove('scale-95');
+                content.classList.add('scale-100');
+            }, 10);
+            
+            // Initialize year options if not already done
+            const yearSelect = document.getElementById('summaryYear');
+            if (yearSelect.children.length === 0) {
+                const currentYear = new Date().getFullYear();
+                for (let y = currentYear; y >= currentYear - 3; y--) {
+                    const opt = document.createElement('option');
+                    opt.value = y;
+                    opt.textContent = y;
+                    yearSelect.appendChild(opt);
+                }
+                
+                // Pre-select current month/year
+                const now = new Date();
+                document.getElementById('summaryMonth').value = now.getMonth() + 1;
+                document.getElementById('summaryYear').value = now.getFullYear();
+            }
+            
+            loadHoursSummary();
+        }
+
+        function closeHoursSummary() {
+            const modal = document.getElementById('hoursSummaryModal');
+            const content = document.getElementById('hoursSummaryModalContent');
+            content.classList.remove('scale-100');
+            content.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 150);
+        }
+
+        async function loadHoursSummary() {
+            const loader = document.getElementById('summaryLoader');
+            const content = document.getElementById('summaryContent');
+            
+            loader.classList.remove('hidden');
+            content.classList.add('hidden');
+            
+            const month = document.getElementById('summaryMonth').value;
+            const year = document.getElementById('summaryYear').value;
+            const token = localStorage.getItem('ponto_token');
+            
+            try {
+                if (window.API_READY) await window.API_READY;
+                const response = await apiFetch(`/api/user/hours-summary?month=${month}&year=${year}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    document.getElementById('cellWorked').textContent = data.worked;
+                    document.getElementById('cellExpected').textContent = data.expected;
+                    document.getElementById('cellMonthBalance').textContent = data.month_balance;
+                    document.getElementById('cellCarryOver').textContent = data.carry_over;
+                    document.getElementById('cellTotalBalance').textContent = data.total_balance;
+                    
+                    const badge = document.getElementById('statusBadge');
+                    const msg = document.getElementById('statusMessage');
+                    
+                    if (data.status === 'CREDOR') {
+                        badge.className = "text-2xl font-black tracking-widest px-8 py-2 bg-emerald-950/80 border border-emerald-500/50 text-emerald-400 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.3)] animate-pulse";
+                        badge.textContent = "CREDOR";
+                        msg.textContent = `Parabéns! Você possui um saldo positivo acumulado de ${data.total_balance} horas.`;
+                    } else {
+                        badge.className = "text-2xl font-black tracking-widest px-8 py-2 bg-rose-950/80 border border-rose-500/50 text-rose-400 rounded-full shadow-[0_0_15px_rgba(244,63,94,0.3)] animate-pulse";
+                        badge.textContent = "DEVEDOR";
+                        msg.textContent = `Atenção: Você possui um saldo negativo acumulado de ${data.total_balance} horas pendentes de compensação.`;
+                    }
+                    
+                    loader.classList.add('hidden');
+                    content.classList.remove('hidden');
+                } else {
+                    const err = await response.json().catch(() => ({}));
+                    alert('Erro ao carregar resumo de horas: ' + (err.message || 'Erro no servidor'));
+                    closeHoursSummary();
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Erro de conexão com o servidor.');
+                closeHoursSummary();
+            }
+        }
     </script>
+
+    <!-- Hours Summary Modal -->
+    <div id="hoursSummaryModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
+        <div class="bg-[#0f172a]/95 text-slate-100 rounded-3xl shadow-[0_0_50px_rgba(51,112,183,0.3)] w-full max-w-lg border border-slate-700/50 overflow-hidden flex flex-col max-h-[90vh] transition-transform duration-300 scale-95" id="hoursSummaryModalContent">
+            <!-- Modal Header -->
+            <div class="bg-gradient-to-r from-[#1e293b] to-[#0f172a] px-6 py-5 flex justify-between items-center border-b border-slate-800">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-teal-400 text-2xl animate-pulse">monitoring</span>
+                    <div>
+                        <h5 class="font-black text-base uppercase tracking-wider text-slate-200">Resumo de Horas</h5>
+                        <p class="text-[10px] uppercase tracking-widest text-teal-400 font-bold">SRE Carapina - Tempo Real</p>
+                    </div>
+                </div>
+                <button onclick="closeHoursSummary()" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors flex justify-center items-center text-slate-400 hover:text-slate-200 shadow-inner">
+                    <span class="material-symbols-outlined text-lg">close</span>
+                </button>
+            </div>
+            
+            <!-- Modal Body -->
+            <div class="p-6 overflow-y-auto space-y-6">
+                <!-- Filter Selectors -->
+                <div class="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 flex gap-3 items-center justify-between">
+                    <div class="flex-1">
+                        <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Selecionar Mês</label>
+                        <select id="summaryMonth" onchange="loadHoursSummary()" class="w-full bg-slate-950 border border-slate-800 rounded-lg h-10 px-3 text-xs font-bold text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500">
+                            <option value="1">Janeiro</option>
+                            <option value="2">Fevereiro</option>
+                            <option value="3">Março</option>
+                            <option value="4">Abril</option>
+                            <option value="5">Maio</option>
+                            <option value="6">Junho</option>
+                            <option value="7">Julho</option>
+                            <option value="8">Agosto</option>
+                            <option value="9">Setembro</option>
+                            <option value="10">Outubro</option>
+                            <option value="11">Novembro</option>
+                            <option value="12">Dezembro</option>
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Selecionar Ano</label>
+                        <select id="summaryYear" onchange="loadHoursSummary()" class="w-full bg-slate-950 border border-slate-800 rounded-lg h-10 px-3 text-xs font-bold text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500">
+                            <!-- Will be populated dynamically -->
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Loader -->
+                <div id="summaryLoader" class="flex flex-col items-center justify-center py-10 gap-3">
+                    <div class="w-10 h-10 border-4 border-teal-500/20 border-t-teal-500 rounded-full animate-spin"></div>
+                    <span class="text-xs font-medium text-slate-400 tracking-wider">Calculando horas...</span>
+                </div>
+
+                <!-- Content Panel -->
+                <div id="summaryContent" class="hidden space-y-6">
+                    <!-- Excel Style Replica Table -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden p-4 shadow-inner">
+                        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-xs">table_chart</span>
+                            Apuração da Planilha Excel
+                        </div>
+                        
+                        <div class="border border-slate-950 rounded-xl overflow-hidden shadow-2xl font-mono text-sm">
+                            <!-- Table Row: Carga Trabalhada -->
+                            <div class="flex border-b border-slate-950">
+                                <div class="w-2/3 bg-[#1e293b] text-slate-200 px-4 py-3 flex items-center font-sans font-semibold text-xs border-r border-slate-950">
+                                    Carga Horária Trabalhada (Mês)
+                                </div>
+                                <div class="w-1/3 bg-[#ffff00] text-[#000080] font-black px-4 py-3 text-center border-l border-slate-950 shadow-inner text-base" id="cellWorked">
+                                    00:00:00
+                                </div>
+                            </div>
+                            
+                            <!-- Table Row: Carga Prevista -->
+                            <div class="flex border-b border-slate-950">
+                                <div class="w-2/3 bg-[#1e293b] text-slate-200 px-4 py-3 flex items-center font-sans font-semibold text-xs border-r border-slate-950">
+                                    Carga Horária Prevista (Mês)
+                                </div>
+                                <div class="w-1/3 bg-[#ffff00] text-[#000080] font-black px-4 py-3 text-center border-l border-slate-950 shadow-inner text-base" id="cellExpected">
+                                    00:00:00
+                                </div>
+                            </div>
+                            
+                            <!-- Table Row: Saldo Mês -->
+                            <div class="flex border-b border-slate-950">
+                                <div class="w-2/3 bg-[#1e293b] text-slate-200 px-4 py-3 flex items-center font-sans font-semibold text-xs border-r border-slate-950">
+                                    Saldo Carga Horária (Mês)
+                                </div>
+                                <div class="w-1/3 bg-[#ffff00] text-[#000080] font-black px-4 py-3 text-center border-l border-slate-950 shadow-inner text-base" id="cellMonthBalance">
+                                    00:00:00
+                                </div>
+                            </div>
+                            
+                            <!-- Table Row: Saldo Mês Anterior -->
+                            <div class="flex border-b border-slate-950">
+                                <div class="w-2/3 bg-[#1e293b] text-slate-200 px-4 py-3 flex items-center font-sans font-semibold text-xs border-r border-slate-950">
+                                    Saldo Mês Anterior (Carryover)
+                                </div>
+                                <div class="w-1/3 bg-[#92d050] text-[#000080] font-black px-4 py-3 text-center border-l border-slate-950 shadow-inner text-base" id="cellCarryOver">
+                                    00:00:00
+                                </div>
+                            </div>
+                            
+                            <!-- Table Row: Saldo Total -->
+                            <div class="flex">
+                                <div class="w-2/3 bg-[#1e293b] text-slate-200 px-4 py-3 flex items-center font-sans font-semibold text-xs border-r border-slate-950">
+                                    Saldo Total Acumulado
+                                </div>
+                                <div class="w-1/3 bg-[#ffff00] text-[#000080] font-black px-4 py-3 text-center border-l border-slate-950 shadow-inner text-base" id="cellTotalBalance">
+                                    00:00:00
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Status Panel -->
+                    <div class="bg-slate-900/40 p-5 rounded-2xl border border-slate-800/80 flex flex-col items-center justify-center relative overflow-hidden group">
+                        <!-- Tech overlay grids -->
+                        <div class="absolute inset-0 bg-gradient-to-b from-transparent to-teal-500/5 pointer-events-none"></div>
+                        
+                        <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 relative z-10">Status do Colaborador</span>
+                        <div id="statusBadge" class="text-3xl font-black tracking-widest px-8 py-2.5 rounded-full border relative z-10 shadow-lg transition-all duration-300">
+                            CARREGANDO
+                        </div>
+                        <p class="text-[10px] text-slate-400 font-bold mt-3 text-center leading-relaxed max-w-xs relative z-10" id="statusMessage">
+                            Aguarde a apuração em tempo real...
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Modal Footer -->
+            <div class="bg-[#1e293b]/40 px-6 py-4 flex justify-end border-t border-slate-800">
+                <button onclick="closeHoursSummary()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold tracking-wider transition-all shadow border border-slate-700/60 uppercase">
+                    Fechar Resumo
+                </button>
+            </div>
+        </div>
+    </div>
 
 </body>
 </html>

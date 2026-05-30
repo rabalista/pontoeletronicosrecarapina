@@ -79,6 +79,16 @@ def ensure_sql_server_tables():
                 )
                 INSERT INTO SystemConfig ([key], [value]) VALUES ('excel_protection_password', 'Sedu@2023')
             END
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='UserBalances' and xtype='U')
+            BEGIN
+                CREATE TABLE UserBalances (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    matricula NVARCHAR(50) NOT NULL,
+                    year_month NVARCHAR(7) NOT NULL,
+                    balance_seconds INT NOT NULL,
+                    CONSTRAINT UQ_UserBalances UNIQUE (matricula, year_month)
+                )
+            END
             """)
             conn.close()
         except Exception as e:
@@ -101,6 +111,16 @@ def ensure_sql_server_tables():
                         [value] NVARCHAR(MAX)
                     )
                     INSERT INTO SystemConfig ([key], [value]) VALUES ('excel_protection_password', 'Sedu@2023')
+                END
+                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='UserBalances' and xtype='U')
+                BEGIN
+                    CREATE TABLE UserBalances (
+                        id INT IDENTITY(1,1) PRIMARY KEY,
+                        matricula NVARCHAR(50) NOT NULL,
+                        year_month NVARCHAR(7) NOT NULL,
+                        balance_seconds INT NOT NULL,
+                        CONSTRAINT UQ_UserBalances UNIQUE (matricula, year_month)
+                    )
                 END
                 """)
                 conn.close()
@@ -311,6 +331,15 @@ def ensure_sqlite_schema(conn):
         CREATE TABLE IF NOT EXISTS CustomHolidays (
             date_str TEXT PRIMARY KEY,
             description TEXT NOT NULL
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS UserBalances (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            matricula TEXT NOT NULL,
+            year_month TEXT NOT NULL,
+            balance_seconds INTEGER NOT NULL,
+            UNIQUE(matricula, year_month)
         )
     """)
     # Default passwords
@@ -2016,6 +2045,426 @@ def update_admin_config(curr_user_mat, role):
     except Exception as e:
         return jsonify({'message': str(e)}), 500
 
+@app.route('/api/admin/users/<matricula>/balances', methods=['GET'])
+@token_required
+def get_user_balances(curr_user_mat, role, matricula):
+    if role != 'admin':
+        return jsonify({'message': 'Unauthorized'}), 401
+    conn = get_db_connection()
+    ph = get_ph(conn)
+    cursor = conn.cursor()
+    try:
+        is_sq = isinstance(conn, sqlite3.Connection)
+        nolock = "" if is_sq else "WITH (NOLOCK)"
+        cursor.execute(f"SELECT year_month, balance_seconds FROM UserBalances {nolock} WHERE matricula = {ph} ORDER BY year_month DESC", (matricula,))
+        rows = cursor.fetchall()
+        balances = []
+        for r in rows:
+            sec = rf(r, 'balance_seconds')
+            sign = "-" if sec < 0 else ""
+            asec = abs(sec)
+            h = asec // 3600
+            m = (asec % 3600) // 60
+            formatted = f"{sign}{h:02d}:{m:02d}"
+            balances.append({
+                'year_month': rf(r, 'year_month'),
+                'balance_seconds': sec,
+                'formatted': formatted
+            })
+        return jsonify(balances)
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
+@app.route('/api/admin/users/<matricula>/balances', methods=['POST'])
+@token_required
+def save_user_balance(curr_user_mat, role, matricula):
+    if role != 'admin':
+        return jsonify({'message': 'Unauthorized'}), 401
+    data = request.get_json()
+    year_month = data.get('year_month')
+    balance_str = data.get('balance', '').strip()
+    
+    if not year_month or not balance_str:
+        return jsonify({'message': 'Mês e Saldo são obrigatórios'}), 400
+        
+    try:
+        is_neg = balance_str.startswith('-')
+        clean_bal = balance_str.lstrip('-').lstrip('+')
+        parts = clean_bal.split(':')
+        if len(parts) == 1:
+            hours = int(parts[0])
+            minutes = 0
+        elif len(parts) == 2:
+            hours = int(parts[0])
+            minutes = int(parts[1])
+        else:
+            raise ValueError()
+            
+        total_seconds = (hours * 3600) + (minutes * 60)
+        if is_neg:
+            total_seconds = -total_seconds
+    except:
+        return jsonify({'message': 'Formato de saldo inválido. Use HH:MM (ex: 10:30 ou -05:15)'}), 400
+
+    conn = get_db_connection()
+    ph = get_ph(conn)
+    is_sqlite = isinstance(conn, sqlite3.Connection)
+    try:
+        cursor = conn.cursor()
+        
+        # Ensure table exists on SQL Server if using it (just to be safe)
+        if not is_sqlite:
+            try:
+                cursor.execute("""
+                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='UserBalances' and xtype='U')
+                BEGIN
+                    CREATE TABLE UserBalances (
+                        id INT IDENTITY(1,1) PRIMARY KEY,
+                        matricula NVARCHAR(50) NOT NULL,
+                        year_month NVARCHAR(7) NOT NULL,
+                        balance_seconds INT NOT NULL,
+                        CONSTRAINT UQ_UserBalances UNIQUE (matricula, year_month)
+                    )
+                END
+                """)
+                conn.commit()
+            except: pass
+
+        cursor.execute(f"DELETE FROM UserBalances WHERE matricula = {ph} AND year_month = {ph}", (matricula, year_month))
+        cursor.execute(f"INSERT INTO UserBalances (matricula, year_month, balance_seconds) VALUES ({ph}, {ph}, {ph})", (matricula, year_month, total_seconds))
+        
+        try: conn.commit()
+        except: pass
+        
+        if not is_sqlite:
+            try:
+                sconn = sqlite3.connect(sqlite_path)
+                scur = sconn.cursor()
+                scur.execute("DELETE FROM UserBalances WHERE matricula = ? AND year_month = ?", (matricula, year_month))
+                scur.execute("INSERT INTO UserBalances (matricula, year_month, balance_seconds) VALUES (?, ?, ?)", (matricula, year_month, total_seconds))
+                sconn.commit()
+                sconn.close()
+            except Exception as e:
+                print(f"Error mirroring balance: {e}")
+                
+        try:
+            cursor.execute(f"UPDATE Users SET must_clear_cache = 1 WHERE matricula = {ph}", (matricula,))
+            if not is_sqlite:
+                sconn = sqlite3.connect(sqlite_path)
+                sconn.execute("UPDATE Users SET must_clear_cache = 1 WHERE matricula = ?", (matricula,))
+                sconn.commit()
+                sconn.close()
+        except: pass
+                
+        return jsonify({'message': 'Saldo Salvo com Sucesso!'}), 200
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
+@app.route('/api/admin/users/<matricula>/balances/<year_month>', methods=['DELETE'])
+@token_required
+def delete_user_balance(curr_user_mat, role, matricula, year_month):
+    if role != 'admin':
+        return jsonify({'message': 'Unauthorized'}), 401
+        
+    conn = get_db_connection()
+    ph = get_ph(conn)
+    is_sqlite = isinstance(conn, sqlite3.Connection)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(f"DELETE FROM UserBalances WHERE matricula = {ph} AND year_month = {ph}", (matricula, year_month))
+        try: conn.commit()
+        except: pass
+        
+        if not is_sqlite:
+            try:
+                sconn = sqlite3.connect(sqlite_path)
+                scur = sconn.cursor()
+                scur.execute("DELETE FROM UserBalances WHERE matricula = ? AND year_month = ?", (matricula, year_month))
+                sconn.commit()
+                sconn.close()
+            except: pass
+            
+        try:
+            cursor.execute(f"UPDATE Users SET must_clear_cache = 1 WHERE matricula = {ph}", (matricula,))
+            if not is_sqlite:
+                sconn = sqlite3.connect(sqlite_path)
+                sconn.execute("UPDATE Users SET must_clear_cache = 1 WHERE matricula = ?", (matricula,))
+                sconn.commit()
+                sconn.close()
+        except: pass
+            
+        return jsonify({'message': 'Saldo excluído com sucesso!'}), 200
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
+def format_seconds_to_hours(total_seconds):
+    sign = "-" if total_seconds < 0 else ""
+    asec = int(abs(total_seconds))
+    h = asec // 3600
+    m = (asec % 3600) // 60
+    s = asec % 60
+    return f"{sign}{h}:{m:02d}:{s:02d}"
+
+def calculate_monthly_balances_recursive(user_matricula, target_year, target_month):
+    conn = get_db_connection()
+    ph = get_ph(conn)
+    is_sqlite = isinstance(conn, sqlite3.Connection)
+    nolock = "" if is_sqlite else "WITH (NOLOCK)"
+    
+    # 1. Fetch user's first punch
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT timestamp FROM TimeRecords {nolock} WHERE matricula = {ph} ORDER BY timestamp ASC", (user_matricula,))
+    row = cursor.fetchone()
+    first_punch_month = None
+    if row:
+        ts = rf(row, 'timestamp')
+        dt = ts if isinstance(ts, datetime.datetime) else datetime.datetime.strptime(str(ts).split('.')[0], '%Y-%m-%d %H:%M:%S')
+        first_punch_month = datetime.date(dt.year, dt.month, 1)
+    if not first_punch_month:
+        first_punch_month = datetime.date(target_year, target_month, 1)
+
+    # 2. Get user workload
+    cursor.execute(f"SELECT workload FROM Users {nolock} WHERE matricula = {ph}", (user_matricula,))
+    urow = cursor.fetchone()
+    user_workload = rf(urow, 'workload') or '40h'
+    try:
+        user_workload_clean = str(user_workload).lower().replace('h','')
+        daily_hours = int(user_workload_clean) / 5
+    except:
+        daily_hours = 8
+
+    # 3. Get all manual balances
+    manual_balances = {}
+    cursor.execute(f"SELECT year_month, balance_seconds FROM UserBalances {nolock} WHERE matricula = {ph}", (user_matricula,))
+    for br in cursor.fetchall():
+        manual_balances[rf(br, 'year_month')] = rf(br, 'balance_seconds')
+
+    # 4. Fetch all user punches for the target year
+    if not is_sqlite:
+        cursor.execute(f"""
+            SELECT record_type, timestamp, is_retroactive, is_reviewed 
+            FROM TimeRecords {nolock} 
+            WHERE matricula = {ph} AND YEAR(timestamp) = {ph}
+        """, (user_matricula, target_year))
+    else:
+        cursor.execute(f"""
+            SELECT record_type, timestamp, is_retroactive, is_reviewed 
+            FROM TimeRecords 
+            WHERE matricula = ? AND strftime('%Y', timestamp) = ?
+        """, (user_matricula, str(target_year)))
+    
+    user_records = []
+    for r in cursor.fetchall():
+        rtype = rf(r, 'record_type') or ''
+        if 'cancelado' in rtype.lower():
+            continue
+        ts = rf(r, 'timestamp')
+        dt = ts if isinstance(ts, datetime.datetime) else datetime.datetime.strptime(str(ts).split('.')[0], '%Y-%m-%d %H:%M:%S')
+        user_records.append({
+            'type': rtype,
+            'time': dt,
+            'is_retroactive': rf(r, 'is_retroactive'),
+            'is_reviewed': rf(r, 'is_reviewed')
+        })
+
+    # Group punches by month and day
+    punches_map = {}
+    for r in user_records:
+        m_key = r['time'].strftime('%Y-%m')
+        d_key = r['time'].strftime('%Y-%m-%d')
+        punches_map.setdefault(m_key, {}).setdefault(d_key, []).append(r)
+
+    conn.close()
+
+    all_holidays = get_all_holidays()
+    month_names = ["JAN", "FEV", "MAR", "ABR", "MAIO", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"]
+    
+    monthly_stats = {}
+    current_carry_over = 0.0
+    
+    for m_idx in range(12):
+        m_num = m_idx + 1
+        m_key = f"{target_year}-{m_num:02d}"
+        this_month_date = datetime.date(target_year, m_num, 1)
+
+        # Determine starting balance for this month
+        if m_key in manual_balances:
+            current_carry_over = manual_balances[m_key]
+        else:
+            if this_month_date < first_punch_month:
+                current_carry_over = 0.0
+            else:
+                if m_idx == 0:
+                    current_carry_over = 0.0
+
+        if m_num > target_month:
+            break
+
+        num_days = calendar.monthrange(target_year, m_num)[1]
+        worked_seconds_month = 0.0
+        expected_seconds_month = 0.0
+        
+        month_punches = punches_map.get(m_key, {})
+        
+        for d_idx in range(1, num_days + 1):
+            d_key_str = f"{target_year}-{m_num:02d}-{d_idx:02d}"
+            current_date = datetime.date(target_year, m_num, d_idx)
+            
+            is_before_active = current_date < first_punch_month
+            is_weekend = current_date.weekday() >= 5
+            is_holiday = is_weekend or (current_date.strftime('%m-%d') in all_holidays) or (d_key_str in all_holidays)
+            
+            if is_before_active:
+                continue
+                
+            expected_sec = 0 if is_holiday else (daily_hours * 3600)
+            
+            day_punches = month_punches.get(d_key_str, [])
+            
+            has_atestado = False
+            has_abono = False
+            has_ferias = False
+            has_comp = False
+            has_tre = False
+            has_externo = False
+            
+            real_punches = []
+            for p in day_punches:
+                t_str = (p['type'] or "").lower()
+                if any(x in t_str for x in ['compens', 'saldo', 'uso', 'abono', 'atestat', 'férias', 'ferias', 'tre']):
+                    if 'atestado' in t_str and 'dia todo' in t_str: has_atestado = True
+                    elif 'abono' in t_str and 'dia todo' in t_str: has_abono = True
+                    elif 'férias' in t_str or 'ferias' in t_str: has_ferias = True
+                    elif 'tre' in t_str: has_tre = True
+                    else: has_comp = True
+                else:
+                    if 'externo' in t_str or 'diária' in t_str or 'diaria' in t_str: has_externo = True
+                    real_punches.append(p)
+            
+            if has_atestado or has_abono or has_ferias or has_tre:
+                continue
+                
+            final_punches = []
+            grouped = {}
+            for p in real_punches:
+                t = p['type']
+                grouped.setdefault(t, []).append(p)
+            for t, pts in grouped.items():
+                appr = [p for p in pts if p.get('is_retroactive') and p.get('is_reviewed')]
+                if appr: final_punches.append(appr[-1])
+                else: final_punches.extend(pts)
+            
+            final_punches.sort(key=lambda x: x['time'])
+            
+            std_p = [p for p in final_punches if '3º turno' not in (p['type'] or "").lower()]
+            ext_p = [p for p in final_punches if '3º turno' in (p['type'] or "").lower()]
+            
+            ent_m, sai_m, ent_t, sai_t, ent_x, sai_x = None, None, None, None, None, None
+            for i, p in enumerate(std_p[:4]):
+                t_val = p['time'].time()
+                if i == 0: ent_m = t_val
+                elif i == 1: sai_m = t_val
+                elif i == 2: ent_t = t_val
+                elif i == 3: sai_t = t_val
+            for p in ext_p:
+                t_val = p['time'].time()
+                t_str = (p['type'] or "").lower()
+                if 'saída extra' in t_str or 'saida extra' in t_str: sai_x = t_val
+                elif 'entrada extra' in t_str: ent_x = t_val
+            
+            def t_to_s(t):
+                return t.hour * 3600 + t.minute * 60 + t.second
+                
+            w_sec = 0
+            if ent_m and sai_m: w_sec += max(0, t_to_s(sai_m) - t_to_s(ent_m))
+            if ent_t and sai_t: w_sec += max(0, t_to_s(sai_t) - t_to_s(ent_t))
+            if ent_x and sai_x: w_sec -= max(0, t_to_s(sai_x) - t_to_s(ent_x))
+            
+            if has_comp:
+                deficit_sec = max(0, (daily_hours * 3600) - w_sec)
+                worked_seconds_month += w_sec
+                expected_seconds_month += (daily_hours * 3600)
+                worked_seconds_month -= deficit_sec
+            elif has_externo:
+                worked_seconds_month += expected_sec
+                expected_seconds_month += expected_sec
+            else:
+                worked_seconds_month += w_sec
+                expected_seconds_month += expected_sec
+
+        month_balance = worked_seconds_month - expected_seconds_month
+        total_balance = current_carry_over + month_balance
+        
+        monthly_stats[m_num] = {
+            'worked': worked_seconds_month,
+            'expected': expected_seconds_month,
+            'balance': month_balance,
+            'carry_over': current_carry_over,
+            'total': total_balance
+        }
+        
+        current_carry_over = total_balance
+
+    return monthly_stats.get(target_month, {
+        'worked': 0.0,
+        'expected': 0.0,
+        'balance': 0.0,
+        'carry_over': 0.0,
+        'total': 0.0
+    })
+
+@app.route('/api/user/hours-summary', methods=['GET'])
+@token_required
+def get_user_hours_summary_api(curr_user_mat, role):
+    month_arg = request.args.get('month')
+    year_arg = request.args.get('year')
+    target_mat = curr_user_mat
+    
+    if role == 'admin' and request.args.get('matricula'):
+        target_mat = request.args.get('matricula')
+        
+    tz = pytz.timezone('America/Sao_Paulo')
+    now = datetime.datetime.now(tz)
+    
+    try:
+        month = int(month_arg) if month_arg else now.month
+        year = int(year_arg) if year_arg else now.year
+    except ValueError:
+        return jsonify({'message': 'Mês ou ano inválido'}), 400
+        
+    try:
+        stats = calculate_monthly_balances_recursive(target_mat, year, month)
+        
+        worked_str = format_seconds_to_hours(stats['worked'])
+        expected_str = format_seconds_to_hours(stats['expected'])
+        month_balance_str = format_seconds_to_hours(stats['balance'])
+        carry_over_str = format_seconds_to_hours(stats['carry_over'])
+        total_balance_str = format_seconds_to_hours(stats['total'])
+        
+        status = "CREDOR" if stats['total'] >= 0 else "DEVEDOR"
+        
+        return jsonify({
+            'worked': worked_str,
+            'expected': expected_str,
+            'month_balance': month_balance_str,
+            'carry_over': carry_over_str,
+            'total_balance': total_balance_str,
+            'status': status
+        }), 200
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'message': str(e)}), 500
+
 def get_all_holidays():
     holidays = set()
     # Fixed national holidays (mm-dd)
@@ -2287,7 +2736,7 @@ def _generate_json_report(target_user_id):
         try: conn.close()
         except: pass
 
-def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, is_protected, excel_pass, force_mat=None, force_name=None):
+def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, is_protected, excel_pass, force_mat=None, force_name=None, user_balances_map=None):
     try:
         wb = openpyxl.Workbook()
         target_mat = force_mat if force_mat else (rf(user_records[0], 'matricula') if user_records else None)
@@ -2366,6 +2815,16 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
         all_holidays = get_all_holidays()
         month_names = ["JAN", "FEV", "MAR", "ABR", "MAIO", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"]
         
+        # Determine the user's first punch month once to avoid calculating weekday deficits before they started using the system
+        first_punch_month = None
+        if user_records:
+            ts_first = rf(user_records[-1], 'timestamp') 
+            if ts_first:
+                dt_first = ts_first if isinstance(ts_first, datetime.datetime) else datetime.datetime.strptime(str(ts_first).split('.')[0], '%Y-%m-%d %H:%M:%S')
+                first_punch_month = datetime.date(dt_first.year, dt_first.month, 1)
+        if not first_punch_month:
+            first_punch_month = datetime.date(datetime.datetime.now().year, datetime.datetime.now().month, 1)
+
         for m_idx, m_name in enumerate(month_names):
             m_num = m_idx + 1
             if m_name in wb.sheetnames:
@@ -2390,6 +2849,10 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                     d_key_str = f"{m_year}-{m_num:02d}-{d_idx:02d}"
                     
                     current_date = datetime.date(m_year, m_num, d_idx)
+                    # If this date is strictly before the user's first punch month, treat it as F (Holiday/Weekend)
+                    # so that it does not generate automatic weekday deficits when the user was inactive.
+                    is_before_active = current_date < first_punch_month
+                    
                     is_weekend = current_date.weekday() >= 5
                     is_holiday = False
                     if is_weekend:
@@ -2399,7 +2862,7 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                     elif d_key_str in all_holidays:
                         is_holiday = True
                         
-                    ws.cell(row=row_idx, column=1, value='F' if is_holiday else 'U')
+                    ws.cell(row=row_idx, column=1, value='F' if (is_holiday or is_before_active) else 'U')
                     
                     punches = month_data["days"].get(d_key_str, [])
                     
@@ -2523,36 +2986,35 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                 if m_name in TEMPLATE_CELLS:
                     ant_cell = TEMPLATE_CELLS[m_name]['ant']
                     
-                    first_punch_month = None
-                    if user_records:
-                        ts_first = rf(user_records[-1], 'timestamp') 
-                        if ts_first:
-                            dt_first = ts_first if isinstance(ts_first, datetime.datetime) else datetime.datetime.strptime(str(ts_first).split('.')[0], '%Y-%m-%d %H:%M:%S')
-                            first_punch_month = datetime.date(dt_first.year, dt_first.month, 1)
-                    
-                    this_month_date = datetime.date(m_year, m_num, 1)
-                    
-                    is_before_or_start_month = False
-                    if first_punch_month and this_month_date <= first_punch_month:
-                        is_before_or_start_month = True
-                    
-                    if is_before_or_start_month:
-                        ws['Q4'] = 0
+                    custom_bal_sec = None
+                    if user_balances_map and m_key in user_balances_map:
+                        custom_bal_sec = user_balances_map[m_key]
+                        
+                    if custom_bal_sec is not None:
+                        ws['Q4'] = custom_bal_sec / 86400.0
                         ws[ant_cell] = f"=Q4"
                         ws['Q4'].number_format = '[h]:mm:ss'
                         ws[ant_cell].number_format = '[h]:mm:ss'
                     else:
-                        if m_idx > 0:
-                            prev_name = month_names[m_idx - 1]
-                            prev_tot = TEMPLATE_CELLS[prev_name]['tot']
-                            ws['Q4'] = f"='{prev_name}'!{prev_tot}"
-                            ws[ant_cell] = f"=Q4"
-                        else:
-                            prev_bal_days = get_previous_years_balance(user_records, m_year, daily_hours)
-                            ws['Q4'] = prev_bal_days
+                        this_month_date = datetime.date(m_year, m_num, 1)
+                        # If this month is strictly before the user's first punch month, and has no custom balance, set it to 0
+                        if this_month_date < first_punch_month:
+                            ws['Q4'] = 0
                             ws[ant_cell] = f"=Q4"
                             ws['Q4'].number_format = '[h]:mm:ss'
                             ws[ant_cell].number_format = '[h]:mm:ss'
+                        else:
+                            if m_idx > 0:
+                                prev_name = month_names[m_idx - 1]
+                                prev_tot = TEMPLATE_CELLS[prev_name]['tot']
+                                ws['Q4'] = f"='{prev_name}'!{prev_tot}"
+                                ws[ant_cell] = f"=Q4"
+                            else:
+                                prev_bal_days = get_previous_years_balance(user_records, m_year, daily_hours)
+                                ws['Q4'] = prev_bal_days
+                                ws[ant_cell] = f"=Q4"
+                                ws['Q4'].number_format = '[h]:mm:ss'
+                                ws[ant_cell].number_format = '[h]:mm:ss'
                         
         if is_protected:
             from openpyxl.styles import Protection
@@ -2623,19 +3085,52 @@ def _generate_excel_response(target_user_id, target_year_arg=None, is_protected=
                 conn_tmp.close()
             except: pass
 
+        # Fetch manual balances for this user
+        user_balances_map = {}
+        try:
+            b_conn = get_db_connection()
+            b_cur = b_conn.cursor()
+            b_ph = get_ph(b_conn)
+            b_nolock = "" if isinstance(b_conn, sqlite3.Connection) else "WITH (NOLOCK)"
+            if target_user_id:
+                # Find matricula of the user first
+                b_cur.execute(f"SELECT matricula FROM Users {b_nolock} WHERE id = {b_ph}", (target_user_id,))
+                b_row = b_cur.fetchone()
+                if b_row:
+                    user_mat = rf(b_row, 'matricula')
+                    b_cur.execute(f"SELECT year_month, balance_seconds FROM UserBalances {b_nolock} WHERE matricula = {b_ph}", (user_mat,))
+                    for br in b_cur.fetchall():
+                        user_balances_map[rf(br, 'year_month')] = rf(br, 'balance_seconds')
+            b_conn.close()
+        except Exception as e:
+            print(f"Error fetching manual balances: {e}")
+
         if target_user_id:
             if not rows:
                 return jsonify({'message': 'No records found'}), 404
             
             user_records = list(rows)
             user_records.reverse()
-            out = build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, is_protected, excel_pass)
+            out = build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, is_protected, excel_pass, user_balances_map=user_balances_map)
             
             user_n = rf(rows[0], 'name') or target_user_id
             fname = f"Ponto - {user_n}.xlsx"
             return send_file(out, download_name=fname, as_attachment=True)
             
         else:
+            # Fetch all manual balances for all users to pass to ZIP builder
+            all_balances_map = {} # (matricula, year_month) -> balance_seconds
+            try:
+                b_conn = get_db_connection()
+                b_cur = b_conn.cursor()
+                b_nolock = "" if isinstance(b_conn, sqlite3.Connection) else "WITH (NOLOCK)"
+                b_cur.execute(f"SELECT matricula, year_month, balance_seconds FROM UserBalances {b_nolock}")
+                for br in b_cur.fetchall():
+                    all_balances_map[(rf(br, 'matricula'), rf(br, 'year_month'))] = rf(br, 'balance_seconds')
+                b_conn.close()
+            except Exception as e:
+                print(f"Error fetching all manual balances: {e}")
+
             # Zip multiple files
             memory_file = BytesIO()
             with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
@@ -2673,7 +3168,8 @@ def _generate_excel_response(target_user_id, target_year_arg=None, is_protected=
                     user_records = list(user_rows)
                     user_records.reverse()
                     try:
-                        out_wb = build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, is_protected, excel_pass, force_mat=mat, force_name=u_name)
+                        user_balances = {ym: sec for (m, ym), sec in all_balances_map.items() if m == mat}
+                        out_wb = build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, is_protected, excel_pass, force_mat=mat, force_name=u_name, user_balances_map=user_balances)
                         user_n = u_name or mat
                         # Replace invalid characters for filename
                         safe_name = "".join([c for c in user_n if c.isalpha() or c.isdigit() or c in ' -_']).rstrip()
@@ -2683,8 +3179,6 @@ def _generate_excel_response(target_user_id, target_year_arg=None, is_protected=
                         print(f"Error building workbook for {mat}: {loop_e}")
                         
             memory_file.seek(0)
-            return send_file(memory_file, download_name="Relatorio_Geral_Zip.zip", mimetype='application/zip', as_attachment=True)
-            
     except Exception as e:
         import traceback
         traceback.print_exc()

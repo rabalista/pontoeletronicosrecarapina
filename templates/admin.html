@@ -407,9 +407,74 @@
                 <input type="password" id="editPassword" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary/20">
             </div>
         </div>
-        <div class="pt-4 px-6 pb-6 bg-surface-bright border-t border-outline-variant/20 flex justify-end gap-3">
-            <button type="button" onclick="closeEditModal()" class="px-5 py-2.5 rounded-full font-bold text-sm bg-surface-container-high hover:bg-surface-container-highest transition-colors">Cancelar</button>
-            <button type="button" onclick="saveUserEdit()" class="px-5 py-2.5 rounded-full font-bold text-sm bg-primary text-white hover:shadow-lg hover:-translate-y-0.5 transition-all">Salvar Alterações</button>
+        </div>
+    </div>
+</div>
+
+<!-- Balance Adjustment Modal -->
+<div id="userBalanceModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh]">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-teal-600 to-cyan-600 text-white px-8 py-6 flex justify-between items-center shrink-0">
+            <div>
+                <h3 class="text-xl font-bold">Carga Horária Acumulada (Mês Anterior)</h3>
+                <p id="balanceModalSubtitle" class="text-xs text-teal-100 mt-1">Ajuste de saldo de horas para o mês selecionado</p>
+            </div>
+            <button onclick="closeBalanceModal()" class="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white transition-all flex justify-center items-center">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        
+        <!-- Content -->
+        <div class="p-8 overflow-y-auto space-y-6 grow custom-scrollbar">
+            <!-- Instructions Alert -->
+            <div class="bg-teal-50 border border-teal-200 text-teal-900 rounded-2xl p-4 text-xs flex gap-3">
+                <span class="material-symbols-outlined text-teal-600 shrink-0 text-xl">info</span>
+                <div>
+                    <p class="font-bold mb-1">Como funciona o ajuste?</p>
+                    <p class="leading-relaxed">Defina o saldo de horas acumulado que este usuário traz do mês anterior para o mês selecionado. Por exemplo, se em Abril o usuário acumulou 10h de crédito, escolha <strong>Maio</strong> e digite <strong>10:00</strong>. Se tinha débito, digite <strong>-10:00</strong>.</p>
+                </div>
+            </div>
+
+            <!-- Form -->
+            <form onsubmit="saveUserBalance(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-slate-700">Mês Referência</label>
+                    <input type="month" id="balanceMonth" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" required>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-slate-700 flex justify-between">
+                        <span>Saldo de Horas</span>
+                        <span class="text-[10px] text-slate-400 font-normal">Ex: 10:30 ou -05:15</span>
+                    </label>
+                    <input type="text" id="balanceValue" placeholder="HH:MM" class="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 font-mono" required pattern="^[+-]?\d{1,3}:\d{2}$" title="Formato HH:MM ou -HH:MM (Ex: 10:30 ou -05:15)">
+                </div>
+                <button type="submit" class="bg-teal-600 hover:bg-teal-700 text-white font-bold text-sm py-3 px-4 rounded-xl transition-all shadow-md hover:shadow-lg active:scale-95">
+                    Salvar Ajuste
+                </button>
+            </form>
+
+            <!-- Active Adjustments Table -->
+            <div class="space-y-3">
+                <h4 class="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-teal-600 text-lg">history_toggle_off</span>
+                    Ajustes Registrados
+                </h4>
+                <div class="overflow-x-auto rounded-2xl border border-slate-200">
+                    <table class="w-full text-left text-sm border-collapse" id="balanceModalTable">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 text-xs uppercase tracking-wider">
+                                <th class="px-6 py-3">Mês / Ano</th>
+                                <th class="px-6 py-3">Saldo Lançado</th>
+                                <th class="px-6 py-3 text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-700 divide-y divide-slate-100">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -573,6 +638,7 @@
                         </td>
                         <td class="px-6 py-4 text-right flex justify-end gap-1">
                             <button class="p-2 text-primary hover:bg-primary-container rounded-lg" onclick="openUserHistoryModal('${u.matricula}', '${u.name}')" title="Ver Histórico"><span class="material-symbols-outlined text-lg" data-icon="history">history</span></button>
+                            <button class="p-2 text-teal-600 hover:bg-teal-50 rounded-lg" onclick="openBalanceModal('${u.matricula}', '${u.name}')" title="Carga Horária Acumulada"><span class="material-symbols-outlined text-lg" data-icon="more_time">more_time</span></button>
                             <button class="p-2 text-on-surface-variant hover:bg-white/60 rounded-lg" onclick="openEditModal(${u.id})" title="Editar"><span class="material-symbols-outlined text-lg" data-icon="edit">edit</span></button>
                             <button class="p-2 text-purple-600 hover:bg-purple-100 rounded-lg" onclick="resetUserPassword(${u.id}, '${u.name}')" title="Resetar Senha"><span class="material-symbols-outlined text-lg" data-icon="lock_reset">lock_reset</span></button>
                             <button class="p-2 text-orange-500 hover:bg-orange-100 rounded-lg" onclick="clearUserRecords('${u.matricula}')" title="Limpar Registros"><span class="material-symbols-outlined text-lg" data-icon="mop">mop</span></button>
@@ -1789,6 +1855,138 @@
             }
         } catch (e) {
             alert('Erro de conexão ao salvar aviso.');
+        }
+    }
+
+    let currentBalanceMatricula = null;
+    let currentBalanceName = null;
+
+    async function openBalanceModal(matricula, name) {
+        currentBalanceMatricula = matricula;
+        currentBalanceName = name;
+        document.getElementById('balanceModalSubtitle').innerText = `${name} (${matricula})`;
+        
+        // Reset form
+        document.getElementById('balanceMonth').value = '';
+        document.getElementById('balanceValue').value = '';
+        
+        // Load data
+        await loadUserBalances(matricula);
+        
+        document.getElementById('userBalanceModal').classList.remove('hidden');
+    }
+
+    function closeBalanceModal() {
+        document.getElementById('userBalanceModal').classList.add('hidden');
+    }
+
+    async function loadUserBalances(matricula) {
+        const tbody = document.querySelector('#balanceModalTable tbody');
+        tbody.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center text-slate-400 text-xs">Carregando...</td></tr>';
+        
+        const token = localStorage.getItem('ponto_token');
+        try {
+            if (window.API_READY) await window.API_READY;
+            const res = await apiFetch(`/api/admin/users/${matricula}/balances`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const balances = await res.json();
+                tbody.innerHTML = '';
+                if (balances.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center text-slate-400 text-xs">Nenhum ajuste registrado para este usuário.</td></tr>';
+                    return;
+                }
+                
+                balances.forEach(b => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50 transition-colors";
+                    
+                    const isNeg = b.formatted.startsWith('-');
+                    const colorClass = isNeg ? "text-red-600 font-bold font-mono" : "text-emerald-600 font-bold font-mono";
+                    const displayVal = isNeg ? b.formatted : `+${b.formatted}`;
+                    
+                    const parts = b.year_month.split('-');
+                    const displayMonth = `${parts[1]}/${parts[0]}`;
+                    
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 font-medium text-slate-800">${displayMonth}</td>
+                        <td class="px-6 py-4 ${colorClass}">${displayVal}</td>
+                        <td class="px-6 py-4 text-right">
+                            <button class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" onclick="deleteUserBalance('${matricula}', '${b.year_month}')" title="Excluir Ajuste">
+                                <span class="material-symbols-outlined text-lg">delete</span>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center text-red-500 text-xs">Erro ao carregar saldos.</td></tr>';
+            }
+        } catch (err) {
+            tbody.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center text-red-500 text-xs">Erro de conexão ao carregar saldos.</td></tr>';
+        }
+    }
+
+    async function saveUserBalance(event) {
+        event.preventDefault();
+        const yearMonth = document.getElementById('balanceMonth').value;
+        const balance = document.getElementById('balanceValue').value.trim();
+        
+        if (!yearMonth || !balance) {
+            alert('Por favor, preencha todos os campos.');
+            return;
+        }
+        
+        const token = localStorage.getItem('ponto_token');
+        try {
+            if (window.API_READY) await window.API_READY;
+            const res = await apiFetch(`/api/admin/users/${currentBalanceMatricula}/balances`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ year_month: yearMonth, balance: balance })
+            });
+            
+            if (res.ok) {
+                alert('Ajuste de saldo salvo com sucesso!');
+                document.getElementById('balanceMonth').value = '';
+                document.getElementById('balanceValue').value = '';
+                await loadUserBalances(currentBalanceMatricula);
+            } else {
+                const data = await res.json().catch(() => ({ message: 'Erro ao salvar' }));
+                alert(data.message || 'Erro ao salvar ajuste de saldo.');
+            }
+        } catch (err) {
+            alert('Erro de conexão ao salvar ajuste.');
+        }
+    }
+
+    async function deleteUserBalance(matricula, yearMonth) {
+        const parts = yearMonth.split('-');
+        const displayMonth = `${parts[1]}/${parts[0]}`;
+        if (!confirm(`Deseja realmente EXCLUIR o ajuste de saldo do mês de ${displayMonth}?`)) {
+            return;
+        }
+        
+        const token = localStorage.getItem('ponto_token');
+        try {
+            if (window.API_READY) await window.API_READY;
+            const res = await apiFetch(`/api/admin/users/${matricula}/balances/${yearMonth}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (res.ok) {
+                alert('Ajuste de saldo excluído com sucesso!');
+                await loadUserBalances(matricula);
+            } else {
+                alert('Erro ao excluir ajuste.');
+            }
+        } catch (err) {
+            alert('Erro de conexão ao excluir ajuste.');
         }
     }
 </script>

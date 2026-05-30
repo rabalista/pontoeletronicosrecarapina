@@ -27,7 +27,157 @@
                 font-size: 1rem;
             }
         }
+
+        /* Futuristic Left Floating Button */
+        .futuristic-floating-btn {
+            position: fixed;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 1050;
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            border: 1px solid rgba(0, 240, 255, 0.25);
+            border-left: none;
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.15), inset 0 0 10px rgba(0, 240, 255, 0.05);
+            color: #fff;
+            padding: 20px 10px;
+            border-top-right-radius: 16px;
+            border-bottom-right-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            width: 48px;
+        }
+        .futuristic-floating-btn:hover {
+            background: linear-gradient(135deg, #1e293b, #334155);
+            box-shadow: 0 0 35px rgba(0, 240, 255, 0.3), inset 0 0 15px rgba(0, 240, 255, 0.15);
+            border-color: rgba(0, 240, 255, 0.5);
+            width: 54px;
+        }
+        .futuristic-floating-btn .btn-text {
+            writing-mode: vertical-lr;
+            transform: rotate(180deg);
+            font-size: 0.65rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #94a3b8;
+            transition: color 0.3s;
+        }
+        .futuristic-floating-btn:hover .btn-text {
+            color: #00f0ff;
+        }
+        .futuristic-floating-btn .material-symbols-outlined {
+            color: #00f0ff;
+            font-size: 20px;
+            animation: pulse-neon 2s infinite;
+        }
+        @keyframes pulse-neon {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(0, 240, 255, 0.4)); }
+            50% { transform: scale(1.1); filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.8)); }
+        }
+
+        /* Mobile Floating Button */
+        .futuristic-mobile-btn {
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+            z-index: 1050;
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 15px rgba(0, 240, 255, 0.2);
+            color: #fff;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .futuristic-mobile-btn:active {
+            transform: scale(0.9);
+        }
+        .futuristic-mobile-btn .material-symbols-outlined {
+            color: #00f0ff;
+            font-size: 24px;
+        }
+
+        /* Futuristic Hours Modal Styles */
+        .hours-modal-content {
+            background: #0f172a !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            box-shadow: 0 0 50px rgba(0, 240, 255, 0.15) !important;
+            color: #f1f5f9 !important;
+            border-radius: 24px !important;
+        }
+        .hours-modal-header {
+            background: linear-gradient(to right, #1e293b, #0f172a) !important;
+            border-bottom: 1px solid #1e293b !important;
+            padding: 20px 24px !important;
+            border-top-left-radius: 24px !important;
+            border-top-right-radius: 24px !important;
+        }
+        .hours-modal-body {
+            padding: 24px !important;
+        }
+        .excel-table-container {
+            border: 1px solid #1e293b;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        .excel-row {
+            display: flex;
+            border-bottom: 1px solid #1e293b;
+        }
+        .excel-row:last-child {
+            border-bottom: none;
+        }
+        .excel-label {
+            width: 60%;
+            background-color: #1e293b;
+            color: #cbd5e1;
+            padding: 12px 16px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-right: 1px solid #0f172a;
+            display: flex;
+            align-items: center;
+        }
+        .excel-val {
+            width: 40%;
+            background-color: #ffff00;
+            color: #000080;
+            font-family: monospace;
+            font-size: 0.95rem;
+            font-weight: 900;
+            padding: 12px 16px;
+            text-align: center;
+            box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.2);
+        }
+        .excel-val-carryover {
+            background-color: #92d050 !important;
+        }
+        .summary-loader-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(0, 240, 255, 0.1);
+            border-top: 4px solid #00f0ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
+    <!-- Google Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
 </head>
 
 <body class="bg-light">
@@ -127,6 +277,129 @@
         </div>
     </div>
 
+    <!-- Floating Futuristic Button on the Left (Desktop) -->
+    <div class="futuristic-floating-btn d-none d-md-flex" onclick="openHoursSummary()">
+        <span class="material-symbols-outlined">monitoring</span>
+        <span class="btn-text">Resumo Horas</span>
+    </div>
+
+    <!-- Floating Futuristic Button (Mobile - Bottom Left) -->
+    <div class="futuristic-mobile-btn d-md-none" onclick="openHoursSummary()">
+        <span class="material-symbols-outlined">monitoring</span>
+    </div>
+
+    <!-- Hours Summary Modal -->
+    <div class="modal fade" id="hoursSummaryModal" tabindex="-1" aria-labelledby="hoursSummaryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content hours-modal-content">
+                <!-- Modal Header -->
+                <div class="modal-header hours-modal-header d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="material-symbols-outlined" style="color: #00f0ff; font-size: 28px; animation: pulse-neon 2s infinite;">monitoring</span>
+                        <div>
+                            <h5 class="modal-title font-monospace text-uppercase" id="hoursSummaryModalLabel" style="font-weight: 900; letter-spacing: 1px; color: #fff; font-size: 1.1rem;">Resumo de Horas</h5>
+                            <small class="text-uppercase tracking-wider font-bold text-teal" style="color: #00f0ff; font-size: 0.65rem; letter-spacing: 1px; font-weight: 700;">SRE Carapina - Tempo Real</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="background-color: #1e293b; opacity: 0.8; border-radius: 50%; padding: 8px;"></button>
+                </div>
+                
+                <!-- Modal Body -->
+                <div class="modal-body hours-modal-body d-flex flex-column gap-4">
+                    <!-- Filter Selectors -->
+                    <div class="d-flex gap-3 align-items-center justify-content-between p-3 rounded-4 border" style="background: rgba(15, 23, 42, 0.6); border-color: #1e293b !important; border-radius: 16px;">
+                        <div class="flex-grow-1">
+                            <label class="d-block text-uppercase tracking-wider mb-2" style="font-size: 0.6rem; font-weight: 800; color: #94a3b8;">Selecionar Mês</label>
+                            <select id="summaryMonth" onchange="loadHoursSummary()" class="form-select bg-dark border-secondary text-white font-bold" style="font-size: 0.8rem; height: 38px;">
+                                <option value="1">Janeiro</option>
+                                <option value="2">Fevereiro</option>
+                                <option value="3">Março</option>
+                                <option value="4">Abril</option>
+                                <option value="5">Maio</option>
+                                <option value="6">Junho</option>
+                                <option value="7">Julho</option>
+                                <option value="8">Agosto</option>
+                                <option value="9">Setembro</option>
+                                <option value="10">Outubro</option>
+                                <option value="11">Novembro</option>
+                                <option value="12">Dezembro</option>
+                            </select>
+                        </div>
+                        <div class="flex-grow-1">
+                            <label class="d-block text-uppercase tracking-wider mb-2" style="font-size: 0.6rem; font-weight: 800; color: #94a3b8;">Selecionar Ano</label>
+                            <select id="summaryYear" onchange="loadHoursSummary()" class="form-select bg-dark border-secondary text-white font-bold" style="font-size: 0.8rem; height: 38px;">
+                                <!-- Will be populated dynamically -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Loader -->
+                    <div id="summaryLoader" class="d-flex flex-column align-items-center justify-content-center py-5 gap-3">
+                        <div class="summary-loader-spinner"></div>
+                        <span class="font-monospace text-uppercase tracking-wider" style="font-size: 0.7rem; color: #94a3b8; font-weight: 700;">Calculando horas...</span>
+                    </div>
+
+                    <!-- Content Panel -->
+                    <div id="summaryContent" class="d-none d-flex flex-column gap-4">
+                        <!-- Excel Style Replica Table -->
+                        <div class="p-3 rounded-4 border" style="background: rgba(15, 23, 42, 0.8); border-color: #1e293b !important; border-radius: 16px;">
+                            <div class="d-flex align-items-center gap-2 mb-3 text-uppercase tracking-wider" style="font-size: 0.65rem; font-weight: 800; color: #94a3b8;">
+                                <span class="material-symbols-outlined" style="font-size: 14px;">table_chart</span>
+                                Apuração da Planilha Excel
+                            </div>
+                            
+                            <div class="excel-table-container">
+                                <!-- Table Row: Carga Trabalhada -->
+                                <div class="excel-row">
+                                    <div class="excel-label">Carga Horária Trabalhada (Mês)</div>
+                                    <div class="excel-val" id="cellWorked">00:00:00</div>
+                                </div>
+                                
+                                <!-- Table Row: Carga Prevista -->
+                                <div class="excel-row">
+                                    <div class="excel-label">Carga Horária Prevista (Mês)</div>
+                                    <div class="excel-val" id="cellExpected">00:00:00</div>
+                                </div>
+                                
+                                <!-- Table Row: Saldo Mês -->
+                                <div class="excel-row">
+                                    <div class="excel-label">Saldo Carga Horária (Mês)</div>
+                                    <div class="excel-val" id="cellMonthBalance">00:00:00</div>
+                                </div>
+                                
+                                <!-- Table Row: Saldo Mês Anterior -->
+                                <div class="excel-row">
+                                    <div class="excel-label">Saldo Mês Anterior (Acumulado)</div>
+                                    <div class="excel-val excel-val-carryover" id="cellCarryOver">00:00:00</div>
+                                </div>
+                                
+                                <!-- Table Row: Saldo Total -->
+                                <div class="excel-row">
+                                    <div class="excel-label" style="font-weight: 800; color: #fff; background-color: #0f172a;">Saldo Total Acumulado</div>
+                                    <div class="excel-val" id="cellTotalBalance" style="background-color: #00ffff; color: #000080;">00:00:00</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Status Panel -->
+                        <div class="d-flex flex-column align-items-center justify-content-center p-4 rounded-4 border position-relative overflow-hidden" style="background: rgba(15, 23, 42, 0.4); border-color: #1e293b !important; border-radius: 16px;">
+                            <div style="position: absolute; inset: 0; background: linear-gradient(to bottom, transparent, rgba(0,240,255,0.03)); pointer-events: none;"></div>
+                            
+                            <span class="text-uppercase tracking-wider mb-2" style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; z-index: 1;">Status do Colaborador</span>
+                            <div id="statusBadge" class="font-monospace text-uppercase tracking-widest px-4 py-2 rounded-pill border text-center shadow-lg" style="font-weight: 900; z-index: 1; font-size: 1.1rem; min-width: 180px;">
+                                CARREGANDO
+                            </div>
+                            <p class="mt-3 text-center leading-relaxed" id="statusMessage" style="font-size: 0.75rem; color: #94a3b8; font-weight: 500; max-width: 320px; z-index: 1;">
+                                Aguarde a apuração em tempo real...
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="config.js"></script>
     <script>
         let currentLocation = { neighborhood: null, city: null, accuracy: null };
@@ -424,6 +697,98 @@
                     alert(`Atenção: Faltam apenas ${daysRemaining} dia(s) para o fim do mês.\nPor favor, exporte seus registros clicando em 'Baixar Excel'.\nOs dados sumirão da visualização no dia 1º.`);
                     sessionStorage.setItem('monthAlertShown', 'true');
                 }
+            }
+        }
+
+        // --- Hours Summary Logic ---
+        function openHoursSummary() {
+            const modalEl = document.getElementById('hoursSummaryModal');
+            let myModal = bootstrap.Modal.getInstance(modalEl);
+            if (!myModal) {
+                myModal = new bootstrap.Modal(modalEl);
+            }
+            
+            // Initialize year options if not already done
+            const yearSelect = document.getElementById('summaryYear');
+            if (yearSelect.children.length === 0) {
+                const currentYear = new Date().getFullYear();
+                for (let y = currentYear; y >= currentYear - 3; y--) {
+                    const opt = document.createElement('option');
+                    opt.value = y;
+                    opt.textContent = y;
+                    yearSelect.appendChild(opt);
+                }
+                
+                // Pre-select current month/year
+                const now = new Date();
+                document.getElementById('summaryMonth').value = now.getMonth() + 1;
+                document.getElementById('summaryYear').value = now.getFullYear();
+            }
+            
+            myModal.show();
+            loadHoursSummary();
+        }
+
+        async function loadHoursSummary() {
+            const loader = document.getElementById('summaryLoader');
+            const content = document.getElementById('summaryContent');
+            
+            loader.classList.remove('d-none');
+            content.classList.add('d-none');
+            
+            const month = document.getElementById('summaryMonth').value;
+            const year = document.getElementById('summaryYear').value;
+            const token = localStorage.getItem('ponto_token') || localStorage.getItem('token');
+            
+            try {
+                if (window.API_READY) await window.API_READY;
+                const response = await apiFetch(`/api/user/hours-summary?month=${month}&year=${year}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    document.getElementById('cellWorked').textContent = data.worked;
+                    document.getElementById('cellExpected').textContent = data.expected;
+                    document.getElementById('cellMonthBalance').textContent = data.month_balance;
+                    document.getElementById('cellCarryOver').textContent = data.carry_over;
+                    document.getElementById('cellTotalBalance').textContent = data.total_balance;
+                    
+                    const badge = document.getElementById('statusBadge');
+                    const msg = document.getElementById('statusMessage');
+                    
+                    if (data.status === 'CREDOR') {
+                        badge.style.backgroundColor = 'rgba(16, 185, 129, 0.2)';
+                        badge.style.borderColor = '#10b981';
+                        badge.style.color = '#34d399';
+                        badge.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.4)';
+                        badge.textContent = "CREDOR";
+                        msg.textContent = `Parabéns! Você possui um saldo positivo acumulado de ${data.total_balance} horas.`;
+                    } else {
+                        badge.style.backgroundColor = 'rgba(244, 63, 94, 0.2)';
+                        badge.style.borderColor = '#f43f5e';
+                        badge.style.color = '#fb7185';
+                        badge.style.boxShadow = '0 0 15px rgba(244, 63, 94, 0.4)';
+                        badge.textContent = "DEVEDOR";
+                        msg.textContent = `Atenção: Você possui um saldo negativo acumulado de ${data.total_balance} horas pendentes de compensação.`;
+                    }
+                    
+                    loader.classList.add('d-none');
+                    content.classList.remove('d-none');
+                } else {
+                    const err = await response.json().catch(() => ({}));
+                    alert('Erro ao carregar resumo de horas: ' + (err.message || 'Erro no servidor'));
+                    const modalEl = document.getElementById('hoursSummaryModal');
+                    const myModal = bootstrap.Modal.getInstance(modalEl);
+                    if (myModal) myModal.hide();
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Erro de conexão com o servidor.');
+                const modalEl = document.getElementById('hoursSummaryModal');
+                const myModal = bootstrap.Modal.getInstance(modalEl);
+                if (myModal) myModal.hide();
             }
         }
     </script>
