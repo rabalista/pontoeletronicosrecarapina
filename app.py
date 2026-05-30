@@ -3278,14 +3278,27 @@ def _generate_excel_response(target_user_id, target_year_arg=None, is_protected=
             print(f"Error fetching manual balances: {e}")
 
         if target_user_id:
-            if not rows:
-                return jsonify({'message': 'No records found'}), 404
-            
             user_records = list(rows)
             user_records.reverse()
-            out = build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, is_protected, excel_pass, user_balances_map=user_balances_map)
             
-            user_n = rf(rows[0], 'name') or target_user_id
+            # Fetch user details even if they have no records to prevent 404 errors
+            user_n = target_user_id
+            user_m = None
+            try:
+                u_conn = get_db_connection()
+                u_cur = u_conn.cursor()
+                u_ph = get_ph(u_conn)
+                u_nolock = "" if isinstance(u_conn, sqlite3.Connection) else "WITH (NOLOCK)"
+                u_cur.execute(f"SELECT name, matricula FROM Users {u_nolock} WHERE id = {u_ph}", (target_user_id,))
+                u_row = u_cur.fetchone()
+                if u_row:
+                    user_n = rf(u_row, 'name')
+                    user_m = rf(u_row, 'matricula')
+                u_conn.close()
+            except Exception as u_err:
+                print(f"Error fetching user details for blank report: {u_err}")
+                
+            out = build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, is_protected, excel_pass, force_mat=user_m, force_name=user_n, user_balances_map=user_balances_map)
             fname = f"Ponto - {user_n}.xlsx"
             return send_file(out, download_name=fname, as_attachment=True)
             
@@ -3349,8 +3362,8 @@ def _generate_excel_response(target_user_id, target_year_arg=None, is_protected=
                         zf.writestr(fname, out_wb.getvalue())
                     except Exception as loop_e:
                         print(f"Error building workbook for {mat}: {loop_e}")
-                        
             memory_file.seek(0)
+            return send_file(memory_file, download_name="Relatorios.zip", as_attachment=True)
     except Exception as e:
         import traceback
         traceback.print_exc()

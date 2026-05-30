@@ -263,7 +263,7 @@
                     const downloadUrl = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = downloadUrl;
-                    a.download = userId ? `relatorio_user_${userId}.xlsx` : 'relatorio_geral.xlsx';
+                    a.download = userId ? `relatorio_user_${userId}.xlsx` : 'relatorio_geral.zip';
                     document.body.appendChild(a);
                     a.click();
                     a.remove();
