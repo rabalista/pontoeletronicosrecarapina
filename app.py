@@ -3182,8 +3182,7 @@ def build_user_workbook(user_records, target_year_arg, cargo_map, workload_map, 
                                 ws['Q4'] = f"='{prev_name}'!{prev_tot}"
                                 ws[ant_cell] = f"=Q4"
                             else:
-                                prev_bal_days = get_previous_years_balance(user_records, m_year, daily_hours)
-                                ws['Q4'] = prev_bal_days
+                                ws['Q4'] = 0.0
                                 ws[ant_cell] = f"=Q4"
                                 ws['Q4'].number_format = '[h]:mm:ss'
                                 ws[ant_cell].number_format = '[h]:mm:ss'
