@@ -1567,11 +1567,11 @@
                     if (match.is_retroactive && !match.is_reviewed) return "";
 
                     let time = match.timestamp.split(' ')[1].substring(0, 5);
-                    if (match.is_retroactive) {
+                    if (match.is_retroactive && match.justification && match.justification.trim() !== "") {
                         time += "*";
                         const existing = justifications.find(j => j.day === d.getDate());
                         if (!existing) {
-                            justifications.push({ day: d.getDate(), text: match.justification || 'Ajuste Manual' });
+                            justifications.push({ day: d.getDate(), text: match.justification.trim() });
                         }
                     }
                     return time;

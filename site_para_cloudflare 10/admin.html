@@ -307,6 +307,7 @@
                         <td><input class="form-control" type="password" placeholder="Opcional" data-field="password"></td>
                         <td>
                             <button class="btn btn-sm btn-success me-1">Salvar</button>
+                            <button class="btn btn-sm btn-info me-1" title="Preenchimento Automático" onclick="openAutoFillModal('${u.matricula}', '${u.name}')">🪄</button>
                             <button class="btn btn-sm btn-warning me-1" title="Limpar Registros" onclick="clearUserRecords('${u.matricula}')">🧹</button>
                             <button class="btn btn-sm btn-danger">Excluir</button>
                         </td>
@@ -648,11 +649,11 @@
                         if (match.is_retroactive && !match.is_reviewed) return "";
 
                         let time = match.timestamp.split(' ')[1].substring(0, 5);
-                        if (match.is_retroactive) {
+                        if (match.is_retroactive && match.justification && match.justification.trim() !== "") {
                             time += "*";
                             const existing = justifications.find(j => j.day === d.getDate());
                             if (!existing) {
-                                justifications.push({ day: d.getDate(), text: match.justification || 'Ajuste Manual' });
+                                justifications.push({ day: d.getDate(), text: match.justification.trim() });
                             }
                         }
                         return time;
@@ -744,6 +745,113 @@
                 document.body.style.cursor = 'default';
             }
         }    </script>
+
+    <!-- Auto Fill Punches Modal (Bootstrap + Custom Toggle) -->
+    <div id="autoFillModal" class="d-none position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style="z-index: 1050; background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog bg-white rounded shadow-lg" style="max-width: 500px; width: 100%; margin: 1.75rem auto;">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white d-flex justify-content-between p-3">
+                    <h5 class="modal-title m-0">Preenchimento Automático</h5>
+                    <button type="button" class="btn-close btn-close-white" onclick="closeAutoFillModal()"></button>
+                </div>
+                <form onsubmit="submitAutoFill(event)" class="p-3">
+                    <input type="hidden" id="autoFillMatricula">
+                    <p id="autoFillModalSubtitle" class="small text-muted mb-3">Preencher dias úteis de um mês para o usuário</p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Selecione o Mês</label>
+                        <input type="month" id="autoFillMonth" required class="form-control">
+                    </div>
+                    
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small">Entrada</label>
+                            <input type="time" id="autoFillEntrada" value="08:00" required class="form-control">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Saída Almoço</label>
+                            <input type="time" id="autoFillSaidaAlmoco" value="12:00" required class="form-control">
+                        </div>
+                    </div>
+                    
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small">Retorno Almoço</label>
+                            <input type="time" id="autoFillVoltaAlmoco" value="13:00" required class="form-control">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Saída</label>
+                            <input type="time" id="autoFillSaida" value="17:00" required class="form-control">
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info py-2 px-3 small mb-3">
+                        O sistema gerará as 4 batidas nos horários indicados para os dias úteis. Finais de semana, feriados e dias já preenchidos serão pulados.
+                    </div>
+                    
+                    <div class="text-end">
+                        <button type="button" onclick="closeAutoFillModal()" class="btn btn-secondary me-2">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openAutoFillModal(matricula, name) {
+            document.getElementById('autoFillMatricula').value = matricula;
+            document.getElementById('autoFillModalSubtitle').innerText = `Preenchimento em lote para: ${name} (${matricula})`;
+            document.getElementById('autoFillMonth').value = '';
+            document.getElementById('autoFillEntrada').value = '08:00';
+            document.getElementById('autoFillSaidaAlmoco').value = '12:00';
+            document.getElementById('autoFillVoltaAlmoco').value = '13:00';
+            document.getElementById('autoFillSaida').value = '17:00';
+            document.getElementById('autoFillModal').classList.remove('d-none');
+        }
+
+        function closeAutoFillModal() {
+            document.getElementById('autoFillModal').classList.add('d-none');
+        }
+
+        async function submitAutoFill(event) {
+            event.preventDefault();
+            const matricula = document.getElementById('autoFillMatricula').value;
+            const month = document.getElementById('autoFillMonth').value;
+            const entrada = document.getElementById('autoFillEntrada').value;
+            const saida_almoco = document.getElementById('autoFillSaidaAlmoco').value;
+            const volta_almoco = document.getElementById('autoFillVoltaAlmoco').value;
+            const saida = document.getElementById('autoFillSaida').value;
+            
+            if (!month || !entrada || !saida_almoco || !volta_almoco || !saida) {
+                alert('Por favor, preencha todos os campos.');
+                return;
+            }
+            
+            const token = localStorage.getItem('ponto_token');
+            try {
+                if (window.API_READY) await window.API_READY;
+                const res = await apiFetch(`/api/admin/users/${matricula}/auto-fill`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ month, entrada, saida_almoco, volta_almoco, saida })
+                });
+                
+                const data = await res.json().catch(() => ({ message: 'Erro no servidor' }));
+                if (res.ok) {
+                    alert(data.message || 'Ponto preenchido com sucesso!');
+                    closeAutoFillModal();
+                } else {
+                    alert(data.message || 'Erro ao processar preenchimento automático.');
+                }
+            } catch (err) {
+                alert('Erro de conexão ao realizar preenchimento automático.');
+            }
+        }
+    </script>
 </body>
 
 </html>

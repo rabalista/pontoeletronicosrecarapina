@@ -1674,6 +1674,178 @@ def bulk_delete_users(curr_user_mat, role):
         return jsonify({'message': f'{len(ids)} excluídos'}), 200
     except Exception as e:
         return jsonify({'message': str(e)}), 500
+
+@app.route('/api/admin/users/<matricula>/auto-fill', methods=['POST'])
+@token_required
+def auto_fill_user_punches(curr_user_mat, role, matricula):
+    if role != 'admin':
+        return jsonify({'message': 'Unauthorized'}), 401
+    
+    data = request.json
+    month_str = data.get('month')
+    t_entrada = data.get('entrada')
+    t_saida_almoco = data.get('saida_almoco')
+    t_volta_almoco = data.get('volta_almoco')
+    t_saida = data.get('saida')
+    
+    if not all([month_str, t_entrada, t_saida_almoco, t_volta_almoco, t_saida]):
+        return jsonify({'message': 'Todos os campos são obrigatórios'}), 400
+        
+    try:
+        year, month = map(int, month_str.split('-'))
+        for t in [t_entrada, t_saida_almoco, t_volta_almoco, t_saida]:
+            datetime.datetime.strptime(t, "%H:%M")
+    except ValueError:
+        return jsonify({'message': 'Formato de mês ou horários inválido'}), 400
+        
+    conn = get_db_connection()
+    ph = get_ph(conn)
+    is_sqlite = isinstance(conn, sqlite3.Connection)
+    
+    try:
+        cursor = conn.cursor()
+        nolock = "" if is_sqlite else "WITH (NOLOCK)"
+        cursor.execute(f"SELECT id, name, cargo FROM Users {nolock} WHERE matricula = {ph}", (matricula,))
+        row = cursor.fetchone()
+        
+        if not row:
+            lconn = sqlite3.connect(sqlite_path)
+            lconn.row_factory = sqlite3.Row
+            lcur = lconn.cursor()
+            lcur.execute("SELECT id, name, cargo FROM Users WHERE matricula = ?", (matricula,))
+            row = lcur.fetchone()
+            lconn.close()
+            
+        if not row:
+            return jsonify({'message': 'Usuário não encontrado'}), 404
+            
+        sync_user_id = rf(row, 'id')
+        user_name = rf(row, 'name')
+        user_cargo = rf(row, 'cargo') or 'Funcionario'
+        
+        all_holidays = get_all_holidays()
+        
+        start_date = datetime.datetime(year, month, 1)
+        if month == 12:
+            end_date = datetime.datetime(year + 1, 1, 1)
+        else:
+            end_date = datetime.datetime(year, month + 1, 1)
+            
+        cursor.execute(f"SELECT timestamp FROM TimeRecords {nolock} WHERE matricula = {ph} AND timestamp >= {ph} AND timestamp < {ph}", (matricula, start_date, end_date))
+        rows = cursor.fetchall()
+        
+        local_days = set()
+        try:
+            lconn = sqlite3.connect(sqlite_path)
+            lconn.row_factory = sqlite3.Row
+            lcur = lconn.cursor()
+            lcur.execute("SELECT timestamp FROM TimeRecords WHERE matricula = ? AND timestamp >= ? AND timestamp < ?", (matricula, start_date, end_date))
+            lrows = lcur.fetchall()
+            for r in lrows:
+                ts = rf(r, 'timestamp')
+                if ts:
+                    dt = ts if isinstance(ts, datetime.datetime) else datetime.datetime.strptime(str(ts).split('.')[0], '%Y-%m-%d %H:%M:%S')
+                    local_days.add(dt.strftime('%Y-%m-%d'))
+            lconn.close()
+        except:
+            pass
+            
+        existing_days = set()
+        for r in rows:
+            ts = rf(r, 'timestamp')
+            if ts:
+                dt = ts if isinstance(ts, datetime.datetime) else datetime.datetime.strptime(str(ts).split('.')[0], '%Y-%m-%d %H:%M:%S')
+                existing_days.add(dt.strftime('%Y-%m-%d'))
+                
+        existing_days.update(local_days)
+        
+        num_days = calendar.monthrange(year, month)[1]
+        punches_to_insert = []
+        
+        for day in range(1, num_days + 1):
+            curr_date = datetime.date(year, month, day)
+            day_str = curr_date.strftime('%Y-%m-%d')
+            
+            if curr_date.weekday() >= 5:
+                continue
+                
+            if curr_date.strftime('%m-%d') in all_holidays or day_str in all_holidays:
+                continue
+                
+            if day_str in existing_days:
+                continue
+                
+            punch_times = [
+                ('Entrada', t_entrada),
+                ('Saída Almoço', t_saida_almoco),
+                ('Volta Almoço', t_volta_almoco),
+                ('Saída', t_saida)
+            ]
+            
+            for p_type, p_time in punch_times:
+                hh, mm = map(int, p_time.split(':'))
+                p_timestamp = datetime.datetime(year, month, day, hh, mm, 0)
+                transaction_id = f"auto_{int(time.time() * 1000)}_{matricula}_{day}_{p_type.replace(' ', '_')}"
+                punches_to_insert.append({
+                    'type': p_type,
+                    'time': p_timestamp,
+                    'tx_id': transaction_id
+                })
+                
+        if not punches_to_insert:
+            return jsonify({'message': 'Nenhum ponto inserido (todos os dias úteis já possuem registros ou são feriados/finais de semana).'}), 200
+            
+        inserted_primary = False
+        if (not is_sqlite and DB_ONLINE) or USE_SQLITE:
+            try:
+                for p in punches_to_insert:
+                    query = f"""
+                        INSERT INTO TimeRecords 
+                        (user_id, matricula, record_type, timestamp, latitude, longitude, accuracy, 
+                         neighborhood, city, full_address, user_name, transaction_id, cargo, 
+                         is_retroactive, justification, is_reviewed) 
+                        VALUES ({ph}, {ph}, {ph}, {ph}, NULL, NULL, NULL, 
+                                'Preenchimento Automático', 'Admin', 'Ajuste em Lote pelo Administrador', 
+                                {ph}, {ph}, {ph}, 1, '', 1)
+                    """
+                    cursor.execute(query, (
+                        sync_user_id, matricula, p['type'], p['time'],
+                        user_name, p['tx_id'], user_cargo
+                    ))
+                if not is_sqlite:
+                    conn.commit()
+                inserted_primary = True
+            except Exception as e:
+                print(f"Error inserting auto-filled punches in SQL Server: {e}")
+                
+        try:
+            sconn = sqlite3.connect(sqlite_path)
+            ensure_sqlite_schema(sconn)
+            scur = sconn.cursor()
+            for p in punches_to_insert:
+                scur.execute("""
+                    INSERT OR IGNORE INTO TimeRecords 
+                    (user_id, matricula, user_name, record_type, neighborhood, city, full_address, 
+                     timestamp, transaction_id, cargo, is_retroactive, justification, is_reviewed) 
+                    VALUES (?, ?, ?, ?, 'Preenchimento Automático', 'Admin', 'Ajuste em Lote pelo Administrador', 
+                            ?, ?, ?, 1, '', 1)
+                """, (
+                    sync_user_id, matricula, user_name, p['type'],
+                    p['time'], p['tx_id'], user_cargo
+                ))
+            sconn.commit()
+            sconn.close()
+        except Exception as e:
+            print(f"Error inserting auto-filled punches in local SQLite: {e}")
+            if is_sqlite:
+                return jsonify({'message': f'Erro ao salvar no banco local: {str(e)}'}), 500
+                
+        return jsonify({'message': f'{len(punches_to_insert)} batidas de ponto criadas com sucesso (dias úteis preenchidos).'}), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'message': f'Erro no processamento: {str(e)}'}), 500
     finally:
         try: conn.close()
         except: pass

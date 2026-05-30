@@ -362,6 +362,70 @@
     </div>
 </div>
 
+<!-- Auto Fill Punches Modal (Tailwind) -->
+<div id="autoFillModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-5 flex justify-between items-center shrink-0">
+            <div>
+                <h5 class="font-bold text-lg">Preenchimento Automático</h5>
+                <p id="autoFillModalSubtitle" class="text-xs text-blue-100 mt-0.5">Preencher dias úteis de um mês para o usuário</p>
+            </div>
+            <button onclick="closeAutoFillModal()" class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white transition-all flex justify-center items-center">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <!-- Content -->
+        <form onsubmit="submitAutoFill(event)" class="p-6 overflow-y-auto space-y-4 grow custom-scrollbar">
+            <input type="hidden" id="autoFillMatricula">
+            
+            <div class="space-y-1">
+                <label class="text-xs font-bold text-on-surface-variant">Selecione o Mês</label>
+                <input type="month" id="autoFillMonth" required class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary/20">
+            </div>
+            
+            <div class="grid grid-cols-2 gap-3">
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-on-surface-variant">Entrada</label>
+                    <input type="time" id="autoFillEntrada" value="08:00" required class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary/20">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-on-surface-variant">Saída Almoço</label>
+                    <input type="time" id="autoFillSaidaAlmoco" value="12:00" required class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary/20">
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-3">
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-on-surface-variant">Retorno Almoço</label>
+                    <input type="time" id="autoFillVoltaAlmoco" value="13:00" required class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary/20">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-on-surface-variant">Saída</label>
+                    <input type="time" id="autoFillSaida" value="17:00" required class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary/20">
+                </div>
+            </div>
+            
+            <!-- Instructions Info Alert -->
+            <div class="bg-blue-50 border border-blue-200 text-blue-900 rounded-2xl p-4 text-xs flex gap-3">
+                <span class="material-symbols-outlined text-blue-600 shrink-0 text-xl">info</span>
+                <div>
+                    <p class="font-bold mb-1">Como funciona o preenchimento?</p>
+                    <p class="leading-relaxed">O sistema gerará as 4 batidas nos horários indicados para todos os dias de segunda a sexta do mês selecionado. Finais de semana e feriados cadastrados serão pulados automaticamente, e qualquer dia que já possuir registros de ponto também será preservado (ignorado).</p>
+                </div>
+            </div>
+            
+            <!-- Modal Actions Footer -->
+            <div class="flex justify-end gap-3 pt-2">
+                <button type="button" onclick="closeAutoFillModal()" class="px-5 py-2.5 rounded-xl border border-outline/30 text-sm font-semibold hover:bg-black/5 active:scale-95 transition-all text-on-surface">Cancelar</button>
+                <button type="submit" class="px-5 py-2.5 bg-primary text-white hover:bg-primary-hover active:scale-95 transition-all text-sm font-semibold rounded-xl shadow-lg shadow-primary/20 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm">save</span> Salvar Preenchimento
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Edit User Modal (Tailwind) -->
 <div id="editUserModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
@@ -639,6 +703,7 @@
                         <td class="px-6 py-4 text-right flex justify-end gap-1">
                             <button class="p-2 text-primary hover:bg-primary-container rounded-lg" onclick="openUserHistoryModal('${u.matricula}', '${u.name}')" title="Ver Histórico"><span class="material-symbols-outlined text-lg" data-icon="history">history</span></button>
                             <button class="p-2 text-teal-600 hover:bg-teal-50 rounded-lg" onclick="openBalanceModal('${u.matricula}', '${u.name}')" title="Carga Horária Acumulada"><span class="material-symbols-outlined text-lg" data-icon="more_time">more_time</span></button>
+                            <button class="p-2 text-blue-600 hover:bg-blue-100 rounded-lg" onclick="openAutoFillModal('${u.matricula}', '${u.name}')" title="Preenchimento Automático"><span class="material-symbols-outlined text-lg" data-icon="auto_awesome">auto_awesome</span></button>
                             <button class="p-2 text-on-surface-variant hover:bg-white/60 rounded-lg" onclick="openEditModal(${u.id})" title="Editar"><span class="material-symbols-outlined text-lg" data-icon="edit">edit</span></button>
                             <button class="p-2 text-purple-600 hover:bg-purple-100 rounded-lg" onclick="resetUserPassword(${u.id}, '${u.name}')" title="Resetar Senha"><span class="material-symbols-outlined text-lg" data-icon="lock_reset">lock_reset</span></button>
                             <button class="p-2 text-orange-500 hover:bg-orange-100 rounded-lg" onclick="clearUserRecords('${u.matricula}')" title="Limpar Registros"><span class="material-symbols-outlined text-lg" data-icon="mop">mop</span></button>
@@ -1301,11 +1366,11 @@
                     const formatTime = (match) => {
                         if (!match) return "";
                         let time = match.timestamp.split(' ')[1].substring(0, 5);
-                        if (match.is_retroactive) {
+                        if (match.is_retroactive && match.justification && match.justification.trim() !== "") {
                             time += "*";
                             const existing = justifications.find(j => j.day === d.getDate());
                             if (!existing) {
-                                justifications.push({ day: d.getDate(), text: match.justification || 'Ajuste Manual' });
+                                justifications.push({ day: d.getDate(), text: match.justification.trim() });
                             }
                         }
                         return time;
@@ -1987,6 +2052,67 @@
             }
         } catch (err) {
             alert('Erro de conexão ao excluir ajuste.');
+        }
+    }
+
+    function openAutoFillModal(matricula, name) {
+        document.getElementById('autoFillMatricula').value = matricula;
+        document.getElementById('autoFillModalSubtitle').innerText = `Preenchimento em lote para: ${name} (${matricula})`;
+        
+        document.getElementById('autoFillMonth').value = '';
+        document.getElementById('autoFillEntrada').value = '08:00';
+        document.getElementById('autoFillSaidaAlmoco').value = '12:00';
+        document.getElementById('autoFillVoltaAlmoco').value = '13:00';
+        document.getElementById('autoFillSaida').value = '17:00';
+        
+        document.getElementById('autoFillModal').classList.remove('hidden');
+    }
+
+    function closeAutoFillModal() {
+        document.getElementById('autoFillModal').classList.add('hidden');
+    }
+
+    async function submitAutoFill(event) {
+        event.preventDefault();
+        const matricula = document.getElementById('autoFillMatricula').value;
+        const month = document.getElementById('autoFillMonth').value;
+        const entrada = document.getElementById('autoFillEntrada').value;
+        const saida_almoco = document.getElementById('autoFillSaidaAlmoco').value;
+        const volta_almoco = document.getElementById('autoFillVoltaAlmoco').value;
+        const saida = document.getElementById('autoFillSaida').value;
+        
+        if (!month || !entrada || !saida_almoco || !volta_almoco || !saida) {
+            alert('Por favor, preencha todos os campos.');
+            return;
+        }
+        
+        const token = localStorage.getItem('ponto_token');
+        try {
+            if (window.API_READY) await window.API_READY;
+            const res = await apiFetch(`/api/admin/users/${matricula}/auto-fill`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    month: month,
+                    entrada: entrada,
+                    saida_almoco: saida_almoco,
+                    volta_almoco: volta_almoco,
+                    saida: saida
+                })
+            });
+            
+            const data = await res.json().catch(() => ({ message: 'Erro no servidor' }));
+            if (res.ok) {
+                alert(data.message || 'Ponto preenchido com sucesso!');
+                closeAutoFillModal();
+            } else {
+                alert(data.message || 'Erro ao processar preenchimento automático.');
+            }
+        } catch (err) {
+            alert('Erro de conexão ao realizar preenchimento automático.');
         }
     }
 </script>
