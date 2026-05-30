@@ -24,3 +24,7 @@
 - **Modalidade "Externo/Diária":** Implementação de uma nova modalidade de batida de ponto para dias de serviço externo que abrange os quatro tempos.
   - No PDF do E-Docs, a observação consolida como "EXTERNO/DIÁRIA" de maneira única por dia.
   - No Relatório Excel do Administrador, a coluna "Saldo Diário" daquele dia recebe o valor `00:00:00`, não gerando nem débito nem crédito para o banco de horas acumulado.
+- **Preenchimento Automático em Lote:** Adicionada ferramenta para o administrador preencher as 4 batidas diárias de um mês inteiro de forma automática. O sistema ignora finais de semana e dias que já possuam ponto batido.
+- **Correção da Geração de Relatórios (Excel/PDF):**
+  - Ajuste na lógica do "Saldo Anterior" (Célula Q4 no Excel) para evitar erros de tipagem/travamentos na geração das planilhas.
+  - Ocultamento de asteriscos indicativos de ajuste retroativo no E-Docs e outros relatórios quando a batida não contém justificativa real, evitando poluição visual em registros gerados automaticamente pelo sistema.
