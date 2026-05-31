@@ -28,3 +28,8 @@
 - **Correção da Geração de Relatórios (Excel/PDF):**
   - Ajuste na lógica do "Saldo Anterior" (Célula Q4 no Excel) para evitar erros de tipagem/travamentos na geração das planilhas.
   - Ocultamento de asteriscos indicativos de ajuste retroativo no E-Docs e outros relatórios quando a batida não contém justificativa real, evitando poluição visual em registros gerados automaticamente pelo sistema.
+- **Aprimoramentos de Responsividade no Painel Administrativo:**
+  - Cabeçalho fixo revitalizado com efeito glassmorphic blur (`backdrop-blur-md` e fundo branco semi-transparente) para manter o Brasão do Governo ES e título permanentemente fixados na tela de forma visualmente isolada e premium, sem overlaps.
+  - Implementação de barra lateral (*drawer*) retrátil para dispositivos móveis acionada por menu hambúrguer, garantindo acesso completo a configurações de feriados e superintendentes no celular.
+  - Habilitação de rolagem vertical independente (`overflow-y-auto`) na barra lateral para prevenir o encolhimento e embolamento de letras quando exibido em projetores/datashows de baixa resolução.
+

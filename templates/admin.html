@@ -104,14 +104,17 @@
     </style>
 </head>
 <body class="text-on-surface">
+<!-- Side Navigation Shell overlay for mobile -->
+<div id="sidebarOverlay" class="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 hidden transition-opacity duration-300" onclick="toggleSidebar()"></div>
+
 <!-- Side Navigation Shell -->
-<aside class="h-screen w-64 fixed left-0 top-0 bg-white/40 backdrop-blur-md flex flex-col p-4 gap-2 z-40 hidden md:flex border-r border-outline-variant/10">
-<div class="mb-8 px-4 py-6">
+<aside id="sidebar" class="h-screen w-64 fixed left-0 top-0 bg-white/90 backdrop-blur-md flex flex-col p-4 gap-2 z-50 border-r border-outline-variant/10 overflow-y-auto custom-scrollbar transition-transform duration-300 -translate-x-full md:translate-x-0">
+<div class="mb-8 px-4 py-6 shrink-0">
 <img alt="Governo ES Crest" class="h-16 w-auto mx-auto mb-4 drop-shadow-sm" src="https://cdn.es.gov.br/images/logo/governo/brasao/center/Brasao_Governo_500.png"/>
 <h1 class="text-lg font-black text-slate-900 text-center leading-tight">Governo ES</h1>
 <p class="text-xs text-on-surface-variant text-center opacity-70">Time Management</p>
 </div>
-<nav class="flex flex-col gap-2">
+<nav class="flex flex-col gap-2 shrink-0">
 <a class="flex items-center gap-3 bg-white text-blue-700 rounded-xl px-4 py-3 shadow-sm hover:translate-x-1 transition-transform" href="#">
 <span class="material-symbols-outlined" data-icon="settings_applications">settings_applications</span>
 <span class="text-sm font-medium">System</span>
@@ -119,54 +122,57 @@
 </nav>
 
 <!-- Mini Calendário Feriados/Facultativos -->
-<div class="mt-4 p-3 bg-white/60 rounded-xl border border-outline-variant/20 shadow-sm text-sm flex-1 flex flex-col min-h-0">
+<div class="mt-4 p-3 bg-white/60 rounded-xl border border-outline-variant/20 shadow-sm text-sm flex flex-col min-h-0">
     <h3 class="font-bold text-primary text-xs mb-2 flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">calendar_month</span> Feriados / Facultativos</h3>
-    <form onsubmit="addCustomHoliday(event)" class="flex flex-col gap-2 mb-2">
-        <input type="date" id="customHolidayDate" class="w-full text-xs p-1.5 rounded border border-outline-variant/30" required>
-        <input type="text" id="customHolidayDesc" placeholder="Ex: Ponto Facultativo" class="w-full text-xs p-1.5 rounded border border-outline-variant/30" required>
+    <form onsubmit="addCustomHoliday(event); if(window.innerWidth < 768) toggleSidebar();" class="flex flex-col gap-2 mb-2">
+        <input type="date" id="customHolidayDate" class="w-full text-xs p-1.5 rounded border border-outline-variant/30 bg-white" required>
+        <input type="text" id="customHolidayDesc" placeholder="Ex: Ponto Facultativo" class="w-full text-xs p-1.5 rounded border border-outline-variant/30 bg-white" required>
         <button type="submit" class="w-full bg-primary text-white text-xs py-1.5 rounded font-bold hover:bg-primary/90 transition-colors">Adicionar</button>
     </form>
-    <div id="customHolidaysList" class="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-1 text-[10px]">
+    <div id="customHolidaysList" class="max-h-[150px] overflow-y-auto custom-scrollbar flex flex-col gap-1 text-[10px]">
         <!-- Lista preenchida via JS -->
     </div>
 </div>
 <!-- Superintendente Config -->
-<div class="mt-2 p-3 bg-white/60 rounded-xl border border-outline-variant/20 shadow-sm text-sm">
+<div class="mt-2 p-3 bg-white/60 rounded-xl border border-outline-variant/20 shadow-sm text-sm shrink-0">
     <h3 class="font-bold text-primary text-xs mb-2 flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">edit_document</span> Assinatura E-DOCS</h3>
-    <form onsubmit="updateSuperintendent(event)" class="flex flex-col gap-2">
+    <form onsubmit="updateSuperintendent(event); if(window.innerWidth < 768) toggleSidebar();" class="flex flex-col gap-2">
         <label class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">Superintendente / Chefia</label>
-        <input type="text" id="superintendentInput" placeholder="TIAGO GUERCON DA SILVA" class="w-full text-xs p-1.5 rounded border border-outline-variant/30" required>
+        <input type="text" id="superintendentInput" placeholder="TIAGO GUERCON DA SILVA" class="w-full text-xs p-1.5 rounded border border-outline-variant/30 bg-white" required>
         <button type="submit" class="w-full bg-primary text-white text-xs py-1.5 rounded font-bold hover:bg-primary/90 transition-colors">Salvar Nome</button>
     </form>
 </div>
-<div class="mt-auto p-4">
+<div class="mt-auto p-4 shrink-0">
 <button onclick="logout()" class="w-full py-3 px-4 bg-gradient-to-r from-red-600 to-red-400 text-white flex items-center justify-center gap-2 rounded-xl font-bold shadow-lg shadow-red-500/20 active:scale-95 transition-all text-sm">
                 <span class="material-symbols-outlined text-[18px]">logout</span> Sair
             </button>
 </div>
 </aside>
+
 <!-- Top AppBar Shell -->
-<header class="fixed top-0 w-full z-50 md:pl-64">
-<div class="flex flex-col items-center justify-center pt-8 pb-4 w-full bg-transparent pointer-events-none">
-<img alt="Official Crest of Espírito Santo" class="h-14 md:h-16 w-auto mb-4 drop-shadow-md" src="https://cdn.es.gov.br/images/logo/governo/brasao/center/Brasao_Governo_500.png"/>
-<span class="text-xl font-black bg-gradient-to-r from-blue-700 to-pink-500 bg-clip-text text-transparent uppercase tracking-wider">Admin - SRE CARAPINA</span>
-</div>
-<div class="absolute right-8 top-12 flex items-center gap-6">
-    <div class="flex items-center gap-4">
-        <button class="hidden md:flex text-on-surface-variant hover:text-primary relative p-2 rounded-full hover:bg-white/50 transition-colors" onclick="openNotifModal()" title="Configurar Notificação do Sistema">
-            <span class="material-symbols-outlined text-2xl">notifications</span>
+<header class="fixed top-0 left-0 right-0 z-40 bg-white/80 backdrop-blur-md border-b border-outline-variant/10 shadow-sm h-16 flex items-center justify-between px-4 md:px-8 md:pl-72 transition-all">
+    <div class="flex items-center gap-3">
+        <!-- Hamburger Menu for Mobile -->
+        <button onclick="toggleSidebar()" class="md:hidden p-2 hover:bg-black/5 rounded-xl transition-colors flex items-center justify-center text-on-surface-variant" title="Menu">
+            <span class="material-symbols-outlined text-2xl">menu</span>
         </button>
-        <span class="hidden lg:block text-sm font-bold text-on-surface" id="adminName">Admin</span>
-        <button class="md:hidden text-on-surface-variant hover:text-primary relative p-2 rounded-full hover:bg-white/50 transition-colors" onclick="openNotifModal()" title="Configurar Notificação do Sistema">
-            <span class="material-symbols-outlined text-2xl">notifications</span>
+        <!-- Logo & Title -->
+        <div class="flex items-center gap-2">
+            <img alt="Official Crest of Espírito Santo" class="h-8 md:h-10 w-auto drop-shadow-sm" src="https://cdn.es.gov.br/images/logo/governo/brasao/center/Brasao_Governo_500.png"/>
+            <span class="text-sm md:text-base font-black bg-gradient-to-r from-blue-700 to-pink-500 bg-clip-text text-transparent uppercase tracking-wider">Admin - SRE CARAPINA</span>
+        </div>
+    </div>
+    <div class="flex items-center gap-3">
+        <button class="text-on-surface-variant hover:text-primary relative p-2 rounded-full hover:bg-black/5 transition-colors" onclick="openNotifModal()" title="Configurar Notificação do Sistema">
+            <span class="material-symbols-outlined text-xl md:text-2xl">notifications</span>
         </button>
+        <span class="hidden md:block text-sm font-bold text-on-surface" id="adminName">Admin</span>
         <button class="md:hidden text-error hover:bg-error/10 p-2 rounded-full" onclick="logout()" title="Sair"><span class="material-symbols-outlined">logout</span></button>
     </div>
-</div>
 </header>
 
 <!-- Main Content Canvas -->
-<main class="pt-48 pb-12 md:pl-64 px-6 min-h-screen">
+<main class="pt-24 pb-12 md:pl-72 px-4 md:px-8 min-h-screen">
 <div class="max-w-7xl mx-auto space-y-8">
 
 <!-- Section 1: Gestão Administrativa - Ponto Retroativo -->
@@ -545,6 +551,20 @@
 
 <script src="config.js?v=6.8"></script>
     <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (sidebar.classList.contains('-translate-x-full')) {
+                sidebar.classList.remove('-translate-x-full');
+                sidebar.classList.add('translate-x-0');
+                overlay.classList.remove('hidden');
+            } else {
+                sidebar.classList.remove('translate-x-0');
+                sidebar.classList.add('-translate-x-full');
+                overlay.classList.add('hidden');
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const token = localStorage.getItem('ponto_token');
             const role = localStorage.getItem('user_role');
