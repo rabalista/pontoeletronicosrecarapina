@@ -32,4 +32,7 @@
   - Cabeçalho fixo revitalizado com efeito glassmorphic blur (`backdrop-blur-md` e fundo branco semi-transparente) para manter o Brasão do Governo ES e título permanentemente fixados na tela de forma visualmente isolada e premium, sem overlaps.
   - Implementação de barra lateral (*drawer*) retrátil para dispositivos móveis acionada por menu hambúrguer, garantindo acesso completo a configurações de feriados e superintendentes no celular.
   - Habilitação de rolagem vertical independente (`overflow-y-auto`) na barra lateral para prevenir o encolhimento e embolamento de letras quando exibido em projetores/datashows de baixa resolução.
+- **Nova Carga Horária (25h):**
+  - Adicionada opção de carga horária de **25h** nas interfaces de cadastro inicial e gestão de usuários (administração).
+  - O sistema de relatórios calcula e distribui de forma dinâmica as **5 horas diárias** nas planilhas Excel para os usuários com este modelo de carga horária.
 
