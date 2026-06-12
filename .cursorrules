@@ -1,0 +1,10 @@
+{
+  "slashCommands": [
+    {
+      "command": "openspec",
+      "description": "Rodar o assistente do OpenSpec",
+      "instruction": "Execute o comando 'openspec' no terminal para processar o projeto."
+    }
+  ],
+  "rules": []
+}

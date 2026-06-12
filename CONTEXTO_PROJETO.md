@@ -35,4 +35,6 @@
 - **Nova Carga Horária (25h):**
   - Adicionada opção de carga horária de **25h** nas interfaces de cadastro inicial e gestão de usuários (administração).
   - O sistema de relatórios calcula e distribui de forma dinâmica as **5 horas diárias** nas planilhas Excel para os usuários com este modelo de carga horária.
+- **Resolução de Erro de Conexão (502 Bad Gateway no Ngrok):**
+  - Correção de falha de inicialização do backend na porta 5005 (que causava erro 502 no Ngrok) ocasionada pela falta de dependências do Python (como Flask). Resolvido via reinstalação dos pacotes pelo `requirements.txt`.
 
