@@ -35,6 +35,7 @@
 - **Nova Carga Horária (25h):**
   - Adicionada opção de carga horária de **25h** nas interfaces de cadastro inicial e gestão de usuários (administração).
   - O sistema de relatórios calcula e distribui de forma dinâmica as **5 horas diárias** nas planilhas Excel para os usuários com este modelo de carga horária.
-- **Resolução de Erro de Conexão (502 Bad Gateway no Ngrok):**
-  - Correção de falha de inicialização do backend na porta 5005 (que causava erro 502 no Ngrok) ocasionada pela falta de dependências do Python (como Flask). Resolvido via reinstalação dos pacotes pelo `requirements.txt`.
-
+- **Migração de Conta de Usuário no Windows e Automação do Ngrok:**
+  - **Reconstrução do Ambiente Virtual (`.venv`):** Recriação do ambiente virtual do Python (`.venv`) nativo para Windows na pasta do projeto e de produção (`C:\usr\PontoEletronico`), resolvendo incompatibilidades de ambiente antigo e reinstalando todas as dependências (`flask`, `pymssql`, etc.) listadas em `requirements.txt`.
+  - **Execução via `.venv`:** Ajuste no arquivo `INICIAR_SISTEMA.bat` para rodar os scripts utilizando o Python local do ambiente virtual (`.\.venv\Scripts\python.exe`), eliminando falhas de pacotes não encontrados no Python global do novo usuário.
+  - **Autenticação Automática do Ngrok:** Implementação de rotina de autodetecção de configuração do Ngrok em `run_ngrok.py` para evitar solicitações redundantes de credenciais, incluindo o authtoken padrão do usuário diretamente no script como fallback seguro.

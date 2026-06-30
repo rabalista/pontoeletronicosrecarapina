@@ -1,7 +1,7 @@
 @echo off
 TITLE SINCRONIZAR SISTEMA - PONTO ELETRONICO
 color 0B
-cd /d "C:\usr\PontoEletronico"
+cd /d "%~dp0"
 
 echo ===================================================
 echo   BUSCANDO ATUALIZACOES DA MAQUINA PRINCIPAL

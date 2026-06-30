@@ -1,7 +1,7 @@
 @echo off
 TITLE ENVIAR ATUALIZACOES PARA GITHUB
 color 0E
-cd /d "C:\usr\PontoEletronico"
+cd /d "%~dp0"
 
 echo ===================================================
 echo   ENVIANDO CODIGO E BACKUP PARA O GITHUB

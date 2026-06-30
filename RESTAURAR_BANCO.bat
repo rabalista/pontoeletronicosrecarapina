@@ -1,13 +1,13 @@
 @echo off
 TITLE RESTAURAR BANCO DE DADOS - PONTO ELETRONICO
 color 0C
-cd /d "C:\usr\PontoEletronico"
+cd /d "%~dp0"
 
 echo ===================================================
 echo   AVISO: ISSO VAI SUBSTITUIR O BANCO DE DADOS ATUAL!
 echo ===================================================
 echo.
-echo Procurando backup em: C:\usr\PontoEletronico\PontoEletronicoDB.bak
+echo Procurando backup em: %~dp0PontoEletronicoDB.bak
 echo.
 
 if not exist "PontoEletronicoDB.bak" (
@@ -24,7 +24,7 @@ echo.
 echo Restaurando... (Isso pode demorar alguns segundos)
 
 :: Tenta pegar as configurações do .env ou usa padrão
-sqlcmd -S .\SQLEXPRESS -U admin_site -P Sedu@2026 -Q "ALTER DATABASE [PontoEletronicoDB] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; RESTORE DATABASE [PontoEletronicoDB] FROM DISK = 'C:\usr\PontoEletronico\PontoEletronicoDB.bak' WITH REPLACE; ALTER DATABASE [PontoEletronicoDB] SET MULTI_USER;"
+sqlcmd -S .\SQLEXPRESS -U admin_site -P Sedu@2026 -Q "ALTER DATABASE [PontoEletronicoDB] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; RESTORE DATABASE [PontoEletronicoDB] FROM DISK = '%~dp0PontoEletronicoDB.bak' WITH REPLACE; ALTER DATABASE [PontoEletronicoDB] SET MULTI_USER;"
 
 if %ERRORLEVEL% EQU 0 (
     echo.

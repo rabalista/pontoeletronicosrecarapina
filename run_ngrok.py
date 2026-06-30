@@ -22,14 +22,18 @@ def get_local_ip():
         s.close()
     return ip
 
+DEFAULT_TOKEN = "37rYktf7cs1PRM1XUZqJPzTjIIV_5VQh47diEHV6c8JNA6u1f"
+
 def install_auth_token():
-    print("\n🔐 CONFIGURAÇÃO DO NGROK (Acesso Externo)")
-    print("Para funcionar fora da escola (4G), precisamos de um código gratuito.")
-    print("1. Acesse: https://dashboard.ngrok.com/get-started/your-authtoken")
-    print("2. Faça login com Google/Email (é grátis).")
-    print("3. Copie o código que começa com '2...'")
+    token = DEFAULT_TOKEN
+    if not token:
+        print("\n🔐 CONFIGURAÇÃO DO NGROK (Acesso Externo)")
+        print("Para funcionar fora da escola (4G), precisamos de um código gratuito.")
+        print("1. Acesse: https://dashboard.ngrok.com/get-started/your-authtoken")
+        print("2. Faça login com Google/Email (é grátis).")
+        print("3. Copie o código que começa com '2...'")
+        token = input("\n👉 Cole o seu Authtoken aqui e aperte ENTER: ").strip()
     
-    token = input("\n👉 Cole o seu Authtoken aqui e aperte ENTER: ").strip()
     if token:
         try:
             subprocess.run(["ngrok", "config", "add-authtoken", token], check=True)
@@ -124,12 +128,30 @@ def run_backend():
     except Exception as e:
         print(f"❌ Erro no Backend: {e}")
 
+def is_ngrok_configured():
+    paths = [
+        os.path.expanduser("~/.ngrok2/ngrok.yml"),
+        os.path.expandvars(r"%USERPROFILE%\AppData\Local\ngrok\ngrok.yml"),
+        os.path.expandvars(r"%APPDATA%\ngrok\ngrok.yml"),
+    ]
+    for path in paths:
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if "authtoken" in content:
+                        return True
+            except Exception:
+                pass
+    return False
+
 if __name__ == "__main__":
-    # Verifica se já tem config
-    config_path = os.path.expanduser("~/.ngrok2/ngrok.yml")
-    print("Verificando configuração...")
+    print("Verificando configuração do Ngrok...")
     
-    install_auth_token()
+    if not is_ngrok_configured():
+        install_auth_token()
+    else:
+        print("✅ Ngrok já está configurado!")
     
     # Inicia Backend em paralelo
     threading.Thread(target=run_backend, daemon=True).start()
