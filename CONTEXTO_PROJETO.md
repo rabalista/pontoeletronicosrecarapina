@@ -4,6 +4,7 @@
 - **Sistema Operacional:** Windows
 - **Status:** Projeto recomeçado do zero (Docker descartado).
 - **IDE:** Google Antigravity com extensão Graphify.
+- **Portabilidade de Diretórios:** Todos os scripts `.bat` foram atualizados para rodar utilizando `%~dp0`. Isso garante compatibilidade imediata entre diferentes contas ou estruturas de pastas (ex: `C:\usr\PontoEletronico` e `c:\got-rabalista\usr\PontoEletronico`).
 
 ## Infraestrutura
 - **Banco de Dados:** SQL Server 2022 (Instância Local).
@@ -39,3 +40,6 @@
   - **Reconstrução do Ambiente Virtual (`.venv`):** Recriação do ambiente virtual do Python (`.venv`) nativo para Windows na pasta do projeto e de produção (`C:\usr\PontoEletronico`), resolvendo incompatibilidades de ambiente antigo e reinstalando todas as dependências (`flask`, `pymssql`, etc.) listadas em `requirements.txt`.
   - **Execução via `.venv`:** Ajuste no arquivo `INICIAR_SISTEMA.bat` para rodar os scripts utilizando o Python local do ambiente virtual (`.\.venv\Scripts\python.exe`), eliminando falhas de pacotes não encontrados no Python global do novo usuário.
   - **Autenticação Automática do Ngrok:** Implementação de rotina de autodetecção de configuração do Ngrok em `run_ngrok.py` para evitar solicitações redundantes de credenciais, incluindo o authtoken padrão do usuário diretamente no script como fallback seguro.
+- **Scripts Dinâmicos e Multi-Caminho (Compatibilidade de Contas):**
+  - Correção dos scripts `.bat` (`INICIAR_SISTEMA.bat`, `ENVIAR_PARA_GITHUB.bat`, `SINCRONIZAR_DO_GITHUB.bat`, `GERAR_BACKUP_BANCO.bat`, `RESTAURAR_BANCO.bat`) substituindo caminhos absolutos estáticos por caminhos dinâmicos relativos (`%~dp0`).
+  - Agora o versionamento Git e o backup/restauração do banco funcionam de forma consistente em qualquer pasta em que o repositório estiver clonado (facilitando o funcionamento em múltiplas contas e caminhos locais).
