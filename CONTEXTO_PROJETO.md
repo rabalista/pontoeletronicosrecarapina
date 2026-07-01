@@ -105,12 +105,21 @@ Este documento serve como a principal referência técnica e conceitual sobre a 
 
 ## 📂 Estrutura do Workspace
 
-- [app.py](file:///c:/got-rabalista/usr/PontoEletronico/app.py): Arquivo principal do servidor Flask com as APIs, controle de sessões e rotas de renderização.
-- [CONTEXTO_PROJETO.md](file:///c:/got-rabalista/usr/PontoEletronico/CONTEXTO_PROJETO.md): Este arquivo de referência do projeto.
-- [INICIAR_SISTEMA.bat](file:///c:/got-rabalista/usr/PontoEletronico/INICIAR_SISTEMA.bat): Inicializador do servidor web local.
-- [GERAR_BACKUP_BANCO.bat](file:///c:/got-rabalista/usr/PontoEletronico/GERAR_BACKUP_BANCO.bat): Utilitário de backup do SQL Server.
-- [RESTAURAR_BANCO.bat](file:///c:/got-rabalista/usr/PontoEletronico/RESTAURAR_BANCO.bat): Utilitário de restauração do banco de dados.
-- [SINCRONIZAR_DO_GITHUB.bat](file:///c:/got-rabalista/usr/PontoEletronico/SINCRONIZAR_DO_GITHUB.bat): Atualização rápida do código via Git.
+- [app.py](file:///C:/usr/PontoEletronico/app.py): Arquivo principal do servidor Flask com as APIs, controle de sessões e rotas de renderização.
+- [CONTEXTO_PROJETO.md](file:///C:/usr/PontoEletronico/CONTEXTO_PROJETO.md): Este arquivo de referência do projeto.
+- [INICIAR_SISTEMA.bat](file:///C:/usr/PontoEletronico/INICIAR_SISTEMA.bat): Inicializador do servidor web local.
+- [GERAR_BACKUP_BANCO.bat](file:///C:/usr/PontoEletronico/GERAR_BACKUP_BANCO.bat): Utilitário de backup do SQL Server.
+- [RESTAURAR_BANCO.bat](file:///C:/usr/PontoEletronico/RESTAURAR_BANCO.bat): Utilitário de restauração do banco de dados.
+- [SINCRONIZAR_DO_GITHUB.bat](file:///C:/usr/PontoEletronico/SINCRONIZAR_DO_GITHUB.bat): Atualização rápida do código via Git.
+- [ENVIAR_PARA_GITHUB.bat](file:///C:/usr/PontoEletronico/ENVIAR_PARA_GITHUB.bat): Script para salvar o código e backup do banco na nuvem.
 - `local.db`: Banco de dados SQLite local secundário.
 - `templates/` & `static/`: Contêm as telas HTML, estilizações CSS e scripts JS que compõem o frontend.
- forma consistente em qualquer pasta em que o repositório estiver clonado (facilitando o funcionamento em múltiplas contas e caminhos locais).
+
+---
+
+### 10. Centralização de Diretório e Robustez do Git (Julho/2026)
+- **Centralização em `C:\usr\PontoEletronico`**: O projeto foi totalmente unificado no diretório definitivo do usuário (`C:\usr\PontoEletronico`), descartando o uso do caminho provisório `C:\got-rabalista`.
+- **Prevenção de Dubious Ownership**: Configurada a diretiva global `safe.directory "*"` no Git para evitar interrupções de execução por diferenças de propriedade de arquivos do Windows.
+- **Configuração Automática do Git**: O script [ENVIAR_PARA_GITHUB.bat](file:///C:/usr/PontoEletronico/ENVIAR_PARA_GITHUB.bat) agora valida e define dinamicamente a identidade (`user.name` e `user.email`) do autor do commit caso o Git não esteja previamente configurado no computador, assegurando que o fluxo de upload nunca falhe por falta de identidade do usuário.
+- **Sincronização de IP ativo**: Atualização do IP local no arquivo [config.js](file:///C:/usr/PontoEletronico/static/config.js) para `10.131.248.147` (IP ativo da placa Wi-Fi local), restabelecendo conexões diretas ao servidor na porta `5005`.
+
