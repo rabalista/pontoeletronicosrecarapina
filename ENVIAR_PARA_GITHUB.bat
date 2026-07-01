@@ -3,6 +3,15 @@ TITLE ENVIAR ATUALIZACOES PARA GITHUB
 color 0E
 cd /d "%~dp0"
 
+:: Garantir que o Git saiba quem é o usuário para não falhar no commit
+git config user.name >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo Configurando identidade local do Git para evitar erros de commit...
+    git config --local user.name "Ridan Alves Balista"
+    git config --local user.email "rabalista@sedu.es.gov.br"
+)
+
+
 echo ===================================================
 echo   ENVIANDO CODIGO E BACKUP PARA O GITHUB
 echo ===================================================
