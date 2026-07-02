@@ -130,5 +130,7 @@ Este documento serve como a principal referência técnica e conceitual sobre a 
   - Inclusão de caixas de seleção (checkboxes) individuais e globais na listagem de pontos retroativos.
   - Desenvolvimento de novos endpoints no backend para aprovação e exclusão em lote (`/api/admin/retroactive/bulk-approve` e `/api/admin/retroactive/bulk-delete`), que são disparados ao clicar em "Aprovar Selecionados" ou "Eliminar Selecionados" apenas para as linhas selecionadas na tabela.
 - **Filtro de Colaboradores na Exportação de Relatórios**: Adição de uma caixa de busca inteligente sobre o dropdown de seleção de colaboradores na geração de relatórios, facilitando a filtragem por digitação instantânea.
+- **Barra de Pesquisa de Usuários Ativos**: Adicionada uma barra de pesquisa integrada no cabeçalho do painel de "Usuários Ativos" no login administrativo (`admin.html`), que permite filtrar instantaneamente a listagem de colaboradores cadastrados buscando por nome ou matrícula.
+
 
 
