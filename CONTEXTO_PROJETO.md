@@ -123,3 +123,12 @@ Este documento serve como a principal referência técnica e conceitual sobre a 
 - **Configuração Automática do Git**: O script [ENVIAR_PARA_GITHUB.bat](file:///C:/usr/PontoEletronico/ENVIAR_PARA_GITHUB.bat) agora valida e define dinamicamente a identidade (`user.name` e `user.email`) do autor do commit caso o Git não esteja previamente configurado no computador, assegurando que o fluxo de upload nunca falhe por falta de identidade do usuário.
 - **Sincronização de IP ativo**: Atualização do IP local no arquivo [config.js](file:///C:/usr/PontoEletronico/static/config.js) para `10.131.248.147` (IP ativo da placa Wi-Fi local), restabelecendo conexões diretas ao servidor na porta `5005`.
 
+### 11. Recursos Administrativos Avançados (Julho/2026)
+- **Botão Salvar no Modal de Edição**: Introduzido o rodapé com os botões "Cancelar" e "Salvar" na interface de edição de colaboradores ativos, integrando-a com a rota de atualização existente no Flask.
+- **Busca e Seleção Individual/Lote de Pontos Retroativos**:
+  - Implementação de uma barra de busca para filtrar registros pendentes por nome ou matrícula.
+  - Inclusão de caixas de seleção (checkboxes) individuais e globais na listagem de pontos retroativos.
+  - Desenvolvimento de novos endpoints no backend para aprovação e exclusão em lote (`/api/admin/retroactive/bulk-approve` e `/api/admin/retroactive/bulk-delete`), que são disparados ao clicar em "Aprovar Selecionados" ou "Eliminar Selecionados" apenas para as linhas selecionadas na tabela.
+- **Filtro de Colaboradores na Exportação de Relatórios**: Adição de uma caixa de busca inteligente sobre o dropdown de seleção de colaboradores na geração de relatórios, facilitando a filtragem por digitação instantânea.
+
+

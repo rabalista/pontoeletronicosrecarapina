@@ -184,6 +184,22 @@
                     </h2>
 <span class="px-4 py-1.5 bg-secondary-fixed text-on-secondary-fixed rounded-full text-xs font-bold uppercase tracking-wider">Review Required</span>
 </div>
+<div class="flex flex-wrap items-center justify-between gap-4 px-2 py-3 bg-surface-container/30 rounded-xl border border-outline-variant/10">
+    <div class="flex items-center gap-2 max-w-md w-full">
+        <input type="text" id="searchRetro" placeholder="Pesquisar por nome ou matrícula..." class="flex-1 bg-white/50 border border-outline-variant/30 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:outline-none" onkeyup="if(event.key==='Enter') filterRetroactive()">
+        <button onclick="filterRetroactive()" class="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-container transition-all active:scale-95 flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm" data-icon="search">search</span> Pesquisar
+        </button>
+    </div>
+    <div class="flex gap-2">
+        <button onclick="bulkApproveRetro()" class="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-all active:scale-95 flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm" data-icon="done_all">done_all</span> Aprovar Selecionados
+        </button>
+        <button onclick="bulkDeleteRetro()" class="px-4 py-2 bg-error text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-all active:scale-95 flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm" data-icon="delete_sweep">delete_sweep</span> Eliminar Selecionados
+        </button>
+    </div>
+</div>
 <div class="glass-panel rounded-xl shadow-sm overflow-hidden border border-outline-variant/10">
 <!-- Container to hold everything -->
 <div id="retroContainer" class="overflow-x-auto min-h-[200px]">
@@ -191,6 +207,7 @@
     <table class="w-full text-left border-collapse" id="retroTable">
     <thead class="bg-surface-container-low border-b border-outline-variant/20">
     <tr>
+    <th class="px-3 py-4 w-10 text-center"><input type="checkbox" id="selectAllRetro" class="w-4 h-4 text-primary bg-white/50 border-outline-variant/30 rounded focus:ring-primary/20" onchange="toggleSelectAllRetro()"></th>
     <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Colaborador</th>
     <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Data/Hora</th>
     <th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Tipo</th>
@@ -218,7 +235,10 @@
 <div class="space-y-6">
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 <div class="space-y-2">
-<label class="text-sm font-bold text-on-surface-variant">Colaborador</label>
+<div class="flex items-center justify-between">
+    <label class="text-sm font-bold text-on-surface-variant">Colaborador</label>
+    <input type="text" id="searchUserReport" placeholder="Pesquisar por nome..." class="bg-white/50 border border-outline-variant/20 rounded-md px-2 py-0.5 text-xs focus:ring-1 focus:ring-primary/20 focus:outline-none" onkeyup="filterUserReportOptions()">
+</div>
 <select id="userSelect" class="w-full bg-white/50 border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary/20 appearance-none">
 <option value="">Todos (Geral)</option>
 </select>
@@ -478,6 +498,10 @@
                 <label class="text-xs font-bold text-on-surface-variant">Nova Senha <span class="text-[10px] text-outline">(opcional, deixe em branco para não alterar)</span></label>
                 <input type="password" id="editPassword" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary/20">
             </div>
+        </div>
+        <div class="px-6 py-4 bg-surface-container border-t border-outline-variant/20 flex justify-end space-x-3 shrink-0">
+            <button onclick="closeEditModal()" class="px-4 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-colors">Cancelar</button>
+            <button onclick="saveUserEdit()" class="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary-container rounded-lg transition-colors">Salvar</button>
         </div>
         </div>
     </div>
@@ -1104,81 +1128,119 @@
             try {
                 const res = await apiFetch('/api/admin/retroactive', { headers: { 'Authorization': `Bearer ${token}` } });
                 const records = await res.json();
-                const container = document.getElementById('retroContainer');
-                const tbody = document.querySelector('#retroTable tbody');
+                window.allRetroactive = records;
                 
-                if (records.length === 0) {
-                    if (container) container.innerHTML = `<div class='p-12 flex flex-col items-center justify-center text-center space-y-4'><div class='w-16 h-16 bg-white/50 rounded-full flex items-center justify-center'><span class='material-symbols-outlined text-outline text-3xl' data-icon='inbox'>inbox</span></div><div class='max-w-xs'><p class='text-on-surface font-semibold'>Sem solicitações pendentes</p><p class='text-sm text-on-surface-variant'>Não há pedidos de ponto retroativo para análise no momento.</p></div></div>`;
-                    return;
+                // Keep filter sync
+                const query = document.getElementById('searchRetro').value.trim().toLowerCase();
+                if (!query) {
+                    window.filteredRetroactive = [...records];
+                } else {
+                    window.filteredRetroactive = records.filter(r => 
+                        (r.user_name && r.user_name.toLowerCase().includes(query)) ||
+                        (r.matricula && r.matricula.toLowerCase().includes(query))
+                    );
                 }
-                
-                // Ensure table exists (if it was replaced by alert)
-                if (!document.getElementById('retroTable')) {
-                    container.innerHTML = `
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle" id="retroTable">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Colaborador</th>
-                                        <th>Data/Hora</th>
-                                        <th>Tipo</th>
-                                        <th>Justificativa</th>
-                                        <th>Localização</th>
-                                        <th>Anexo</th>
-                                        <th>Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody></tbody>
-                            </table>
-                        </div>`;
-                }
-                const newTbody = document.querySelector('#retroTable tbody');
-                if (newTbody) newTbody.innerHTML = '';
-
-                // card.style.display = 'block'; (Already visible)
-                records.forEach(r => {
-                    const tr = document.createElement('tr');
-                    const hasDoc = r.document_path ? `<a href="/${r.document_path}" target="_blank" class="btn btn-sm btn-outline-info">📄 Ver</a>` : '<span class="text-muted">Sem anexo</span>';
-                    
-                    tr.className = "hover:bg-white/40 transition-colors";
-                    const hasAttachment = r.document_path ? `<a href="/${r.document_path}" target="_blank" class="p-1 px-3 text-xs bg-blue-100 text-blue-700 font-bold rounded-full hover:bg-blue-200">Ver Anexo</a>` : '<span class="text-xs text-outline italic">Sem anexo</span>';
-                    tr.innerHTML = `
-                        <td class="px-6 py-4">
-                            <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-primary font-bold text-xs">${r.user_name.substring(0,2).toUpperCase()}</div>
-                                <div class="flex flex-col">
-                                    <span class="text-sm font-medium">${r.user_name}</span>
-                                    <span class="text-xs text-on-surface-variant font-mono">${r.matricula}</span>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 text-sm">${r.timestamp}</td>
-                        <td class="px-6 py-4"><span class="px-3 py-1 bg-primary-fixed text-on-primary-fixed-variant rounded-full text-xs font-medium">${r.type}</span></td>
-                        <td class="px-6 py-4 text-xs text-on-surface-variant max-w-xs" title="${r.justification || ''}">
-                            ${(() => {
-                                if (!r.justification) return '-';
-                                if (r.justification.includes(' ||| ')) {
-                                    const parts = r.justification.split(' ||| ');
-                                    return `<strong>Motivo:</strong> ${parts[0]}<br><span class="text-primary font-medium"><strong>Observação E-docs:</strong> ${parts[1]}</span>`;
-                                }
-                                return r.justification;
-                            })()}
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="flex flex-col">
-                                <span class="text-xs font-bold text-on-surface">${r.neighborhood || 'Retroativo'}</span>
-                                <span class="text-[10px] text-on-surface-variant">${r.city || 'Ajuste Manual'}</span>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4">${hasAttachment}</td>
-                        <td class="px-6 py-4 text-right space-x-2 whitespace-nowrap">
-                            <button class="p-2 text-green-600 hover:bg-green-50 rounded-lg" onclick="approveRetro('${r.transaction_id}')" title="Aprovar"><span class="material-symbols-outlined" data-icon="check_circle">check_circle</span></button>
-                            <button class="p-2 text-error hover:bg-error-container rounded-lg" onclick="deleteRetro('${r.transaction_id}')" title="Excluir"><span class="material-symbols-outlined" data-icon="delete">delete</span></button>
-                        </td>
-                    `;
-                    if (newTbody) newTbody.appendChild(tr);
-                });
+                renderRetroactivePunches(window.filteredRetroactive);
             } catch (e) { console.error("Erro retroativo:", e); }
+        }
+
+        function renderRetroactivePunches(records) {
+            const container = document.getElementById('retroContainer');
+            
+            if (records.length === 0) {
+                if (container) container.innerHTML = `<div class='p-12 flex flex-col items-center justify-center text-center space-y-4'><div class='w-16 h-16 bg-white/50 rounded-full flex items-center justify-center'><span class='material-symbols-outlined text-outline text-3xl' data-icon='inbox'>inbox</span></div><div class='max-w-xs'><p class='text-on-surface font-semibold'>Sem solicitações pendentes</p><p class='text-sm text-on-surface-variant'>Não há pedidos de ponto retroativo para análise no momento.</p></div></div>`;
+                return;
+            }
+            
+            if (!document.getElementById('retroTable')) {
+                container.innerHTML = `
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle" id="retroTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="text-center w-10"><input type="checkbox" id="selectAllRetro" class="w-4 h-4 text-primary bg-white/50 border-outline-variant/30 rounded focus:ring-primary/20" onchange="toggleSelectAllRetro()"></th>
+                                    <th>Colaborador</th>
+                                    <th>Data/Hora</th>
+                                    <th>Tipo</th>
+                                    <th>Justificativa</th>
+                                    <th>Localização</th>
+                                    <th>Anexo</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>`;
+            }
+            const newTbody = document.querySelector('#retroTable tbody');
+            if (newTbody) newTbody.innerHTML = '';
+
+            records.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-white/40 transition-colors";
+                const hasAttachment = r.document_path ? `<a href="/${r.document_path}" target="_blank" class="p-1 px-3 text-xs bg-blue-100 text-blue-700 font-bold rounded-full hover:bg-blue-200">Ver Anexo</a>` : '<span class="text-xs text-outline italic">Sem anexo</span>';
+                tr.innerHTML = `
+                    <td class="px-3 py-4 text-center">
+                        <input type="checkbox" class="retro-checkbox w-4 h-4 text-primary bg-white/50 border-outline-variant/30 rounded focus:ring-primary/20" data-txid="${r.transaction_id}">
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-primary font-bold text-xs">${r.user_name.substring(0,2).toUpperCase()}</div>
+                            <div class="flex flex-col">
+                                <span class="text-sm font-medium">${r.user_name}</span>
+                                <span class="text-xs text-on-surface-variant font-mono">${r.matricula}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-sm">${r.timestamp}</td>
+                    <td class="px-6 py-4"><span class="px-3 py-1 bg-primary-fixed text-on-primary-fixed-variant rounded-full text-xs font-medium">${r.type}</span></td>
+                    <td class="px-6 py-4 text-xs text-on-surface-variant max-w-xs" title="${r.justification || ''}">
+                        ${(() => {
+                            if (!r.justification) return '-';
+                            if (r.justification.includes(' ||| ')) {
+                                const parts = r.justification.split(' ||| ');
+                                return `<strong>Motivo:</strong> ${parts[0]}<br><span class="text-primary font-medium"><strong>Observação E-docs:</strong> ${parts[1]}</span>`;
+                            }
+                            return r.justification;
+                        })()}
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex flex-col">
+                            <span class="text-xs font-bold text-on-surface">${r.neighborhood || 'Retroativo'}</span>
+                            <span class="text-[10px] text-on-surface-variant">${r.city || 'Ajuste Manual'}</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">${hasAttachment}</td>
+                    <td class="px-6 py-4 text-right space-x-2 whitespace-nowrap">
+                        <button class="p-2 text-green-600 hover:bg-green-50 rounded-lg" onclick="approveRetro('${r.transaction_id}')" title="Aprovar"><span class="material-symbols-outlined" data-icon="check_circle">check_circle</span></button>
+                        <button class="p-2 text-error hover:bg-error-container rounded-lg" onclick="deleteRetro('${r.transaction_id}')" title="Excluir"><span class="material-symbols-outlined" data-icon="delete">delete</span></button>
+                    </td>
+                `;
+                if (newTbody) newTbody.appendChild(tr);
+            });
+        }
+
+        function toggleSelectAllRetro() {
+            const selectAll = document.getElementById('selectAllRetro');
+            if (selectAll) {
+                const checkboxes = document.querySelectorAll('.retro-checkbox');
+                checkboxes.forEach(cb => cb.checked = selectAll.checked);
+            }
+        }
+
+        function filterRetroactive() {
+            const query = document.getElementById('searchRetro').value.trim().toLowerCase();
+            if (!query) {
+                window.filteredRetroactive = [...(window.allRetroactive || [])];
+            } else {
+                window.filteredRetroactive = (window.allRetroactive || []).filter(r => 
+                    (r.user_name && r.user_name.toLowerCase().includes(query)) ||
+                    (r.matricula && r.matricula.toLowerCase().includes(query))
+                );
+            }
+            renderRetroactivePunches(window.filteredRetroactive);
+            const selectAll = document.getElementById('selectAllRetro');
+            if (selectAll) selectAll.checked = false;
         }
 
         async function approveRetro(txId) {
@@ -1203,6 +1265,78 @@
                 });
                 if (res.ok) await loadRetroactivePunches();
             } catch (e) { alert("Erro ao excluir"); }
+        }
+
+        async function bulkApproveRetro() {
+            const checkboxes = document.querySelectorAll('.retro-checkbox:checked');
+            if (checkboxes.length === 0) {
+                alert("Nenhum registro selecionado para aprovação. Por favor, marque as caixas de seleção.");
+                return;
+            }
+            if(!confirm(`Aprovar os ${checkboxes.length} pontos retroativos selecionados?`)) return;
+            const token = localStorage.getItem('ponto_token');
+            const txIds = Array.from(checkboxes).map(cb => cb.getAttribute('data-txid'));
+            try {
+                const res = await apiFetch('/api/admin/retroactive/bulk-approve', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ transaction_ids: txIds })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    alert(data.message);
+                    await loadRetroactivePunches();
+                    const selectAll = document.getElementById('selectAllRetro');
+                    if (selectAll) selectAll.checked = false;
+                } else {
+                    alert("Erro ao aprovar em lote");
+                }
+            } catch (e) { alert("Erro ao aprovar em lote"); }
+        }
+
+        async function bulkDeleteRetro() {
+            const checkboxes = document.querySelectorAll('.retro-checkbox:checked');
+            if (checkboxes.length === 0) {
+                alert("Nenhum registro selecionado para exclusão. Por favor, marque as caixas de seleção.");
+                return;
+            }
+            if(!confirm(`REJEITAR e EXCLUIR permanentemente os ${checkboxes.length} pontos retroativos selecionados?`)) return;
+            const token = localStorage.getItem('ponto_token');
+            const txIds = Array.from(checkboxes).map(cb => cb.getAttribute('data-txid'));
+            try {
+                const res = await apiFetch('/api/admin/retroactive/bulk-delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ transaction_ids: txIds })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    alert(data.message);
+                    await loadRetroactivePunches();
+                    const selectAll = document.getElementById('selectAllRetro');
+                    if (selectAll) selectAll.checked = false;
+                } else {
+                    alert("Erro ao excluir em lote");
+                }
+            } catch (e) { alert("Erro ao excluir em lote"); }
+        }
+
+        function filterUserReportOptions() {
+            const query = document.getElementById('searchUserReport').value.trim().toLowerCase();
+            const select = document.getElementById('userSelect');
+            const options = select.options;
+            for (let i = 0; i < options.length; i++) {
+                const opt = options[i];
+                if (opt.value === "") {
+                    opt.style.display = "";
+                    continue;
+                }
+                if (opt.text.toLowerCase().includes(query)) {
+                    opt.style.display = "";
+                } else {
+                    opt.style.display = "none";
+                }
+            }
         }
 
         function logout() {

@@ -1953,6 +1953,129 @@ def approve_retroactive_punch(curr_user_mat, role, transaction_id):
         try: conn.close()
         except: pass
 
+@app.route('/api/admin/retroactive/bulk-approve', methods=['POST'])
+@token_required
+def bulk_approve_retroactive_punches(curr_user_mat, role):
+    if role != 'admin':
+        return jsonify({'message': 'Unauthorized'}), 401
+    data = request.json or {}
+    tx_ids = data.get('transaction_ids', [])
+    if not tx_ids:
+        return jsonify({'message': 'Nenhum ID fornecido'}), 400
+    
+    conn = get_db_connection()
+    ph = get_ph(conn)
+    success_count = 0
+    try:
+        cursor = conn.cursor()
+        for tx_id in tx_ids:
+            cursor.execute(f"SELECT matricula, record_type, timestamp FROM TimeRecords WHERE transaction_id = {ph}", (tx_id,))
+            row = cursor.fetchone()
+            if row:
+                mat = rf(row, 'matricula')
+                rtype = rf(row, 'record_type')
+                ts = rf(row, 'timestamp')
+                
+                if isinstance(ts, str):
+                    try: 
+                        if '.' in ts: ts = datetime.datetime.strptime(ts, '%Y-%m-%d %H:%M:%S.%f')
+                        else: ts = datetime.datetime.strptime(ts, '%Y-%m-%d %H:%M:%S')
+                    except: pass
+                
+                if isinstance(ts, datetime.datetime):
+                    day_start = ts.replace(hour=0, minute=0, second=0, microsecond=0)
+                    next_day = day_start + datetime.timedelta(days=1)
+                    
+                    del_q = f"DELETE FROM TimeRecords WHERE matricula = {ph} AND record_type = {ph} AND timestamp >= {ph} AND timestamp < {ph} AND transaction_id != {ph}"
+                    cursor.execute(del_q, (mat, rtype, day_start, next_day, tx_id))
+                
+                try: cursor.execute(f"UPDATE Users SET must_clear_cache = 1 WHERE matricula = {ph}", (mat,))
+                except: pass
+
+            cursor.execute(f"UPDATE TimeRecords SET is_reviewed = 1 WHERE transaction_id = {ph}", (tx_id,))
+            
+            # Mirror to local sqlite
+            try:
+                sconn = sqlite3.connect(sqlite_path)
+                if row and isinstance(ts, datetime.datetime):
+                    sconn.execute("DELETE FROM TimeRecords WHERE matricula = ? AND record_type = ? AND timestamp >= ? AND timestamp < ? AND transaction_id != ?", 
+                                  (mat, rtype, day_start, next_day, tx_id))
+                    sconn.execute("UPDATE Users SET must_clear_cache = 1 WHERE matricula = ?", (mat,))
+                sconn.execute("UPDATE TimeRecords SET is_reviewed = 1 WHERE transaction_id = ?", (tx_id,))
+                sconn.commit()
+                sconn.close()
+            except: pass
+            success_count += 1
+            
+        if isinstance(conn, sqlite3.Connection) or ph == '?':
+            conn.commit()
+            
+        return jsonify({'message': f'{success_count} pontos aprovados com sucesso!'})
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
+@app.route('/api/admin/retroactive/bulk-delete', methods=['POST'])
+@token_required
+def bulk_delete_retroactive_punches(curr_user_mat, role):
+    if role != 'admin':
+        return jsonify({'message': 'Unauthorized'}), 401
+    data = request.json or {}
+    tx_ids = data.get('transaction_ids', [])
+    if not tx_ids:
+        return jsonify({'message': 'Nenhum ID fornecido'}), 400
+    
+    conn = get_db_connection()
+    ph = get_ph(conn)
+    success_count = 0
+    try:
+        cursor = conn.cursor()
+        for tx_id in tx_ids:
+            cursor.execute(f"SELECT matricula, record_type FROM TimeRecords WHERE transaction_id = {ph}", (tx_id,))
+            row = cursor.fetchone()
+            target_matricula = rf(row, 'matricula') if row else None
+            rtype = rf(row, 'record_type') if row else None
+            
+            special_types = ['Férias', 'Abono', 'Abono (Dia Todo)', 'Atestado', 'Atestado (Dia Todo)', 'Compensação', 'Uso de Saldo', 'TRE', 'férias', 'ferias']
+            is_special = any(t.lower() in (rtype or "").lower() for t in special_types) if rtype else False
+
+            if is_special:
+                new_type = f"Cancelado pelo Admin - {rtype}"
+                cursor.execute(f"UPDATE TimeRecords SET record_type = {ph}, justification = NULL, document_path = NULL WHERE transaction_id = {ph}", (new_type, tx_id))
+            else:
+                cursor.execute(f"DELETE FROM TimeRecords WHERE transaction_id = {ph}", (tx_id,))
+            
+            if target_matricula:
+                try: cursor.execute(f"UPDATE Users SET must_clear_cache = 1 WHERE matricula = {ph}", (target_matricula,))
+                except: pass
+                
+            # Mirror to local sqlite
+            try:
+                sconn = sqlite3.connect(sqlite_path)
+                if is_special:
+                    sconn.execute("UPDATE TimeRecords SET record_type = ?, justification = NULL, document_path = NULL WHERE transaction_id = ?", (f"Cancelado pelo Admin - {rtype}", tx_id))
+                else:
+                    sconn.execute("DELETE FROM TimeRecords WHERE transaction_id = ?", (tx_id,))
+                
+                if target_matricula:
+                    sconn.execute("UPDATE Users SET must_clear_cache = 1 WHERE matricula = ?", (target_matricula,))
+                sconn.commit()
+                sconn.close()
+            except: pass
+            success_count += 1
+            
+        if isinstance(conn, sqlite3.Connection) or ph == '?':
+            conn.commit()
+            
+        return jsonify({'message': f'{success_count} pontos excluídos com sucesso!'})
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
 @app.route('/api/admin/record/<transaction_id>', methods=['DELETE'])
 @token_required
 def delete_record(curr_user_mat, role, transaction_id):
