@@ -132,5 +132,9 @@ Este documento serve como a principal referência técnica e conceitual sobre a 
 - **Filtro de Colaboradores na Exportação de Relatórios**: Adição de uma caixa de busca inteligente sobre o dropdown de seleção de colaboradores na geração de relatórios, facilitando a filtragem por digitação instantânea.
 - **Barra de Pesquisa de Usuários Ativos**: Adicionada uma barra de pesquisa integrada no cabeçalho do painel de "Usuários Ativos" no login administrativo (`admin.html`), que permite filtrar instantaneamente a listagem de colaboradores cadastrados buscando por nome ou matrícula.
 
+### 12. Correção da Inversão do 3º Turno no Excel (Julho/2026)
+- **Ajuste Físico das Colunas**: Alinhamento com o layout físico do template Excel (onde a coluna J é `saída EXTRA` e a coluna K é `entrada EXTRA`). Os registros de "Saída Extra" agora são devidamente impressos na coluna J (10) e os de "Entrada Extra" na coluna K (11).
+- **Ajuste de Fórmulas e Backend**: A fórmula gerada na planilha foi mantida como `-(K - J)` para computar corretamente a diferença `Saída - Entrada` (já que K é Entrada e J é Saída). Os cálculos em Python (`w_sec` e `worked_sec`) foram ajustados para utilizar sinal positivo de adição (`+=`), somando corretamente o tempo trabalhado em segundos no backend.
+
 
 
